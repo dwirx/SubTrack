@@ -9,8 +9,16 @@
  * deno run --allow-net scripts/setup-telegram-webhook.ts
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '7229466014:AAFAnb8PXJdPtc7wkDe_q-YLt_Z9bJtlh2k';
-const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF || 'kdsnofvyjwuashfkgsye';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
+
+if (!TELEGRAM_BOT_TOKEN) {
+  throw new Error('Missing TELEGRAM_BOT_TOKEN environment variable.');
+}
+
+if (!SUPABASE_PROJECT_REF) {
+  throw new Error('Missing SUPABASE_PROJECT_REF environment variable.');
+}
 
 // Webhook URL - Supabase Edge Function
 const WEBHOOK_URL = `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/telegram-webhook`;
