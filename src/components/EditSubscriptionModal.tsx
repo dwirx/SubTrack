@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, Calendar, Bell, Mail, Phone, Link2, ListOrdered, Clock, AlertTriangle } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Calendar, Bell, Mail, Phone, Link2, ListOrdered, Clock, AlertTriangle, Smile } from 'lucide-react';
 import { supabase, Subscription, CURRENCIES, CATEGORIES, REMINDER_OPTIONS } from '../lib/supabase';
 import { usePreferences } from '../contexts/PreferencesContext';
 import { getServiceIcon, SERVICE_ICONS } from '../lib/serviceIcons';
+import IconPicker from './IconPicker';
 
 type EditSubscriptionModalProps = {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export default function EditSubscriptionModal({ isOpen, onClose, subscription, o
   const { t } = usePreferences();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showCancelFlow, setShowCancelFlow] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     service_name: subscription.service_name,
@@ -45,6 +47,34 @@ export default function EditSubscriptionModal({ isOpen, onClose, subscription, o
   });
 
   const serviceIcon = getServiceIcon(formData.service_name);
+
+  const handleIconSelect = (icon: string, type: 'emoji' | 'url') => {
+    if (type === 'url') {
+      setFormData({ ...formData, icon_emoji: `url:${icon}` });
+    } else {
+      setFormData({ ...formData, icon_emoji: icon });
+    }
+  };
+
+  const getDisplayIcon = () => {
+    if (formData.icon_emoji?.startsWith('url:')) {
+      const url = formData.icon_emoji.replace('url:', '');
+      return (
+        <img src={url} alt="icon" className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded" />
+      );
+    }
+    if (formData.icon_emoji) {
+      return <span className="text-xl sm:text-2xl">{formData.icon_emoji}</span>;
+    }
+    if (serviceIcon) {
+      return (
+        <span className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${serviceIcon.bgColor} text-white text-xs sm:text-sm font-bold`}>
+          {serviceIcon.icon}
+        </span>
+      );
+    }
+    return <span className="text-xl sm:text-2xl">📦</span>;
+  };
 
   useEffect(() => {
     setFormData({
@@ -232,19 +262,27 @@ export default function EditSubscriptionModal({ isOpen, onClose, subscription, o
         
         <div className={`px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between flex-shrink-0 ${serviceIcon ? serviceIcon.bgColor : 'bg-gradient-to-r from-teal-600 to-teal-700'}`}>
           <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0">
-              {serviceIcon ? (
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {formData.icon_emoji?.startsWith('url:') ? (
+                <img 
+                  src={formData.icon_emoji.replace('url:', '')} 
+                  alt={formData.service_name} 
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded"
+                />
+              ) : serviceIcon ? (
                 <span className="text-white text-lg sm:text-2xl font-bold">{serviceIcon.icon}</span>
+              ) : formData.icon_emoji ? (
+                <span className="text-2xl sm:text-3xl">{formData.icon_emoji}</span>
               ) : (
-                <span className="text-2xl sm:text-3xl">{formData.icon_emoji || '📦'}</span>
+                <span className="text-2xl sm:text-3xl">📦</span>
               )}
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-base sm:text-xl font-bold text-white truncate">
-                {t('modals.add.title').replace('Add New', 'Edit')} {subscription.service_name}
+                Edit {formData.service_name}
               </h2>
               <p className="text-white/80 text-xs sm:text-sm mt-0.5 sm:mt-1 truncate">
-                {formData.description || t('app.subtitle')}
+                {formData.description || formData.plan_name || t('app.subtitle')}
               </p>
             </div>
           </div>
@@ -287,22 +325,23 @@ export default function EditSubscriptionModal({ isOpen, onClose, subscription, o
               <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">
                 {t('modals.add.serviceName')} <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xl sm:text-2xl">
-                  {serviceIcon ? (
-                    <span className={`inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${serviceIcon.bgColor} text-white text-xs sm:text-sm font-bold`}>
-                      {serviceIcon.icon}
-                    </span>
-                  ) : (
-                    formData.icon_emoji || '📦'
-                  )}
-                </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIconPicker(true)}
+                  className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 border-2 border-slate-200 rounded-xl flex items-center justify-center hover:border-purple-400 hover:bg-purple-50 transition-all group"
+                  title="Pilih icon"
+                >
+                  {getDisplayIcon()}
+                  <Smile className="w-3 h-3 absolute bottom-1 right-1 text-slate-400 group-hover:text-purple-500 hidden group-hover:block" />
+                </button>
                 <input
                   type="text"
                   required
                   value={formData.service_name}
                   onChange={(e) => setFormData({ ...formData, service_name: e.target.value })}
-                  className="w-full pl-12 sm:pl-14 pr-4 py-2.5 sm:py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-base sm:text-lg"
+                  className="flex-1 px-4 py-2.5 sm:py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-base sm:text-lg"
+                  placeholder="Nama layanan"
                 />
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
@@ -747,6 +786,13 @@ export default function EditSubscriptionModal({ isOpen, onClose, subscription, o
           </div>
         </form>
       </div>
+
+      <IconPicker
+        isOpen={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        onSelect={handleIconSelect}
+        currentIcon={formData.icon_emoji?.startsWith('url:') ? undefined : formData.icon_emoji}
+      />
     </div>
   );
 }

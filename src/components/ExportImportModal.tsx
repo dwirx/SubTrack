@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { X, Download, Upload, FileJson, FileSpreadsheet, Check, AlertCircle } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { X, Download, Upload, FileJson, FileSpreadsheet, Check, AlertCircle, FileUp } from 'lucide-react';
 import { supabase, Subscription } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,6 +14,7 @@ type ExportImportModalProps = {
 type ImportResult = {
   success: number;
   failed: number;
+  skipped: number;
   errors: string[];
 };
 
@@ -23,7 +24,225 @@ export default function ExportImportModal({ isOpen, onClose, onSuccess, subscrip
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedFile, setDraggedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // Parse CSV helper
+  const parseCSV = useCallback((text: string): Partial<Subscription>[] => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+    const data: Partial<Subscription>[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map(v => 
+        v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()
+      ) || [];
+
+      const item: Record<string, unknown> = {};
+      headers.forEach((header, index) => {
+        const value = values[index] || '';
+        const key = header.replace(/\s+/g, '_');
+        
+        if (key === 'price') {
+          item[key] = parseFloat(value) || 0;
+        } else if (key === 'auto_renew') {
+          item[key] = value.toLowerCase() === 'yes' || value === 'true';
+        } else {
+          item[key] = value;
+        }
+      });
+
+      data.push(item as Partial<Subscription>);
+    }
+
+    return data;
+  }, []);
+
+  // Check if subscription already exists (duplicate detection)
+  const isDuplicate = useCallback((item: Partial<Subscription>, existingSubs: Subscription[]): boolean => {
+    const serviceName = (item.service_name || '').toLowerCase().trim();
+    const price = parseFloat(String(item.price)) || 0;
+    const billingCycle = item.billing_cycle || 'monthly';
+    const planName = (item.plan_name || '').toLowerCase().trim();
+
+    return existingSubs.some(sub => {
+      const existingName = sub.service_name.toLowerCase().trim();
+      const existingPlan = (sub.plan_name || '').toLowerCase().trim();
+      
+      // Match by service name + price + billing cycle + plan name
+      return existingName === serviceName && 
+             sub.price === price && 
+             sub.billing_cycle === billingCycle &&
+             existingPlan === planName;
+    });
+  }, []);
+
+  // Process file for import
+  const processFile = useCallback(async (file: File) => {
+    if (!user) {
+      setImportResult({
+        success: 0,
+        failed: 1,
+        skipped: 0,
+        errors: ['User tidak terautentikasi. Silakan login ulang.']
+      });
+      return;
+    }
+
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const text = await file.text();
+      let data: Partial<Subscription>[];
+
+      if (file.name.endsWith('.json')) {
+        data = JSON.parse(text);
+      } else if (file.name.endsWith('.csv')) {
+        data = parseCSV(text);
+      } else {
+        throw new Error('Unsupported file format');
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format - expected array');
+      }
+
+      if (data.length === 0) {
+        throw new Error('File kosong atau tidak ada data valid');
+      }
+
+      const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
+      
+      // Create a copy of existing subscriptions to track newly added ones too
+      const allSubs = [...subscriptions];
+
+      for (const item of data) {
+        try {
+          // Check for duplicates against existing + newly imported
+          if (isDuplicate(item, allSubs)) {
+            result.skipped++;
+            result.errors.push(`${item.service_name}: Sudah ada (duplikat)`);
+            continue;
+          }
+
+          const newSub = {
+            user_id: user.id,
+            service_name: item.service_name || 'Unknown',
+            category: item.category || 'Other',
+            plan_name: item.plan_name || null,
+            price: parseFloat(String(item.price)) || 0,
+            currency: item.currency || 'IDR',
+            billing_cycle: item.billing_cycle || 'monthly',
+            start_date: item.start_date || new Date().toISOString().split('T')[0],
+            next_billing_date: item.next_billing_date || null,
+            payment_method: item.payment_method || null,
+            status: item.status || 'active',
+            auto_renew: item.auto_renew ?? true,
+            notes: item.notes || null,
+            is_shared: item.is_shared ?? false,
+            shared_with_count: item.shared_with_count || null,
+            paid_by_company: item.paid_by_company ?? false,
+            icon_emoji: item.icon_emoji || '📦',
+            tags: item.tags || [],
+            description: item.description || null,
+            subscription_email: item.subscription_email || null,
+            phone_number: item.phone_number || null,
+            cancellation_url: item.cancellation_url || null,
+            cancellation_steps: item.cancellation_steps || null,
+            reminder_days: item.reminder_days || [1, 3, 7],
+            notification_time: item.notification_time || '09:00',
+          };
+
+          const { error } = await supabase.from('subscriptions').insert(newSub);
+
+          if (error) {
+            result.failed++;
+            result.errors.push(`${item.service_name}: ${error.message}`);
+          } else {
+            result.success++;
+            // Add to tracking array to prevent duplicates within same import
+            allSubs.push(newSub as Subscription);
+          }
+        } catch (err) {
+          result.failed++;
+          result.errors.push(`${item.service_name || 'Unknown'}: ${err}`);
+        }
+      }
+
+      setImportResult(result);
+      if (result.success > 0) {
+        onSuccess();
+      }
+    } catch (error) {
+      setImportResult({
+        success: 0,
+        failed: 1,
+        skipped: 0,
+        errors: [`Gagal memproses file: ${error instanceof Error ? error.message : error}`]
+      });
+    } finally {
+      setImporting(false);
+      setDraggedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [user, parseCSV, onSuccess, subscriptions, isDuplicate]);
+
+  // Handle drag events
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropZoneRef.current && !dropZoneRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.name.endsWith('.json') || file.name.endsWith('.csv')) {
+        setDraggedFile(file);
+        processFile(file);
+      } else {
+        setImportResult({
+          success: 0,
+          failed: 1,
+          errors: ['Format file tidak didukung. Gunakan JSON atau CSV.']
+        });
+      }
+    }
+  }, [processFile]);
+
+  // Handle file input change
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setDraggedFile(file);
+      processFile(file);
+    }
+  }, [processFile]);
 
   if (!isOpen) return null;
 
@@ -113,123 +332,6 @@ export default function ExportImportModal({ isOpen, onClose, onSuccess, subscrip
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    setImporting(true);
-    setImportResult(null);
-
-    try {
-      const text = await file.text();
-      let data: Partial<Subscription>[];
-
-      if (file.name.endsWith('.json')) {
-        data = JSON.parse(text);
-      } else if (file.name.endsWith('.csv')) {
-        data = parseCSV(text);
-      } else {
-        throw new Error('Unsupported file format');
-      }
-
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid data format');
-      }
-
-      const result: ImportResult = { success: 0, failed: 0, errors: [] };
-
-      for (const item of data) {
-        try {
-          const { error } = await supabase.from('subscriptions').insert({
-            user_id: user.id,
-            service_name: item.service_name || 'Unknown',
-            category: item.category || 'Other',
-            plan_name: item.plan_name || null,
-            price: parseFloat(String(item.price)) || 0,
-            currency: item.currency || 'IDR',
-            billing_cycle: item.billing_cycle || 'monthly',
-            start_date: item.start_date || new Date().toISOString().split('T')[0],
-            next_billing_date: item.next_billing_date || null,
-            payment_method: item.payment_method || null,
-            status: item.status || 'active',
-            auto_renew: item.auto_renew ?? true,
-            notes: item.notes || null,
-            is_shared: item.is_shared ?? false,
-            shared_with_count: item.shared_with_count || null,
-            paid_by_company: item.paid_by_company ?? false,
-            icon_emoji: item.icon_emoji || '📦',
-            tags: item.tags || [],
-            description: item.description || null,
-            subscription_email: item.subscription_email || null,
-            phone_number: item.phone_number || null,
-            cancellation_url: item.cancellation_url || null,
-            cancellation_steps: item.cancellation_steps || null,
-            reminder_days: item.reminder_days || [1, 3, 7],
-            notification_time: item.notification_time || '09:00',
-          });
-
-          if (error) {
-            result.failed++;
-            result.errors.push(`${item.service_name}: ${error.message}`);
-          } else {
-            result.success++;
-          }
-        } catch (err) {
-          result.failed++;
-          result.errors.push(`${item.service_name || 'Unknown'}: ${err}`);
-        }
-      }
-
-      setImportResult(result);
-      if (result.success > 0) {
-        onSuccess();
-      }
-    } catch (error) {
-      setImportResult({
-        success: 0,
-        failed: 1,
-        errors: [`Failed to parse file: ${error}`]
-      });
-    } finally {
-      setImporting(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const parseCSV = (text: string): Partial<Subscription>[] => {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
-
-    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-    const data: Partial<Subscription>[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map(v => 
-        v.replace(/^"|"$/g, '').replace(/""/g, '"').trim()
-      ) || [];
-
-      const item: Record<string, unknown> = {};
-      headers.forEach((header, index) => {
-        const value = values[index] || '';
-        const key = header.replace(/\s+/g, '_');
-        
-        if (key === 'price') {
-          item[key] = parseFloat(value) || 0;
-        } else if (key === 'auto_renew') {
-          item[key] = value.toLowerCase() === 'yes' || value === 'true';
-        } else {
-          item[key] = value;
-        }
-      });
-
-      data.push(item as Partial<Subscription>);
-    }
-
-    return data;
-  };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-xl">
@@ -305,7 +407,7 @@ export default function ExportImportModal({ isOpen, onClose, onSuccess, subscrip
           ) : (
             <div className="space-y-4">
               <p className="text-sm text-slate-600">
-                Import langganan dari file JSON atau CSV.
+                Import langganan dari file JSON atau CSV. Drag & drop atau klik untuk memilih file.
               </p>
 
               <input
@@ -316,42 +418,108 @@ export default function ExportImportModal({ isOpen, onClose, onSuccess, subscrip
                 className="hidden"
               />
 
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-                className="w-full flex flex-col items-center gap-3 p-6 border-2 border-dashed border-slate-300 rounded-xl hover:border-teal-400 hover:bg-teal-50/50 transition-all disabled:opacity-50"
+              {/* Drag and Drop Zone */}
+              <div
+                ref={dropZoneRef}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={() => !importing && fileInputRef.current?.click()}
+                className={`relative w-full flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-xl 
+                  transition-all duration-300 cursor-pointer
+                  ${isDragging 
+                    ? 'border-teal-500 bg-teal-50 scale-[1.02]' 
+                    : 'border-slate-300 hover:border-teal-400 hover:bg-teal-50/50'
+                  }
+                  ${importing ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
               >
-                {importing ? (
-                  <div className="w-10 h-10 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
-                ) : (
-                  <Upload className="w-10 h-10 text-slate-400" />
+                {/* Animated background when dragging */}
+                {isDragging && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-teal-100/50 to-blue-100/50 rounded-xl animate-pulse" />
                 )}
-                <span className="text-sm font-medium text-slate-600">
-                  {importing ? 'Importing...' : 'Pilih file JSON atau CSV'}
-                </span>
-              </button>
+
+                <div className="relative z-10 flex flex-col items-center gap-3">
+                  {importing ? (
+                    <>
+                      <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
+                      <span className="text-sm font-medium text-teal-600">Importing...</span>
+                    </>
+                  ) : isDragging ? (
+                    <>
+                      <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center animate-bounce">
+                        <FileUp className="w-8 h-8 text-teal-600" />
+                      </div>
+                      <span className="text-sm font-bold text-teal-600">Lepaskan file di sini!</span>
+                    </>
+                  ) : draggedFile ? (
+                    <>
+                      <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
+                        {draggedFile.name.endsWith('.json') ? (
+                          <FileJson className="w-6 h-6 text-orange-500" />
+                        ) : (
+                          <FileSpreadsheet className="w-6 h-6 text-green-500" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">{draggedFile.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center group-hover:bg-teal-100 transition-colors">
+                        <Upload className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <div className="text-center">
+                        <span className="text-sm font-medium text-slate-700 block">
+                          Drag & drop file di sini
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          atau klik untuk memilih file
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded-full flex items-center gap-1">
+                          <FileJson className="w-3 h-3" /> JSON
+                        </span>
+                        <span className="px-2 py-1 bg-green-100 text-green-600 text-xs font-medium rounded-full flex items-center gap-1">
+                          <FileSpreadsheet className="w-3 h-3" /> CSV
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
 
               {importResult && (
                 <div className={`p-4 rounded-xl ${
-                  importResult.failed === 0 ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'
+                  importResult.failed === 0 && importResult.skipped === 0 
+                    ? 'bg-green-50 border border-green-200' 
+                    : 'bg-amber-50 border border-amber-200'
                 }`}>
                   <div className="flex items-center gap-2 mb-2">
-                    {importResult.failed === 0 ? (
+                    {importResult.failed === 0 && importResult.skipped === 0 ? (
                       <Check className="w-5 h-5 text-green-600" />
                     ) : (
                       <AlertCircle className="w-5 h-5 text-amber-600" />
                     )}
                     <span className="font-medium">
-                      {importResult.success} berhasil, {importResult.failed} gagal
+                      {importResult.success} berhasil
+                      {importResult.skipped > 0 && `, ${importResult.skipped} dilewati`}
+                      {importResult.failed > 0 && `, ${importResult.failed} gagal`}
                     </span>
                   </div>
+                  {importResult.skipped > 0 && (
+                    <p className="text-xs text-slate-500 mb-2">
+                      ⚠️ Item yang dilewati sudah ada di database (duplikat)
+                    </p>
+                  )}
                   {importResult.errors.length > 0 && (
                     <ul className="text-xs text-slate-600 space-y-1 max-h-32 overflow-y-auto">
                       {importResult.errors.slice(0, 5).map((err, i) => (
                         <li key={i}>• {err}</li>
                       ))}
                       {importResult.errors.length > 5 && (
-                        <li>...dan {importResult.errors.length - 5} error lainnya</li>
+                        <li>...dan {importResult.errors.length - 5} lainnya</li>
                       )}
                     </ul>
                   )}

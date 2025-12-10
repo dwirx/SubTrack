@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Trash2, Edit2, Users, AlertCircle, Building2, Mail, Phone, ExternalLink, Bell, Clock, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
-import { Subscription, REMINDER_OPTIONS } from '../lib/supabase';
+import { Trash2, Edit2, Users, AlertCircle, Building2, Mail, Phone, ExternalLink, Bell, Clock, ChevronDown, ChevronUp, Calendar, Copy, Check } from 'lucide-react';
+import { Subscription, REMINDER_OPTIONS, supabase } from '../lib/supabase';
 import { usePreferences } from '../contexts/PreferencesContext';
+import { useAuth } from '../contexts/AuthContext';
 import { getServiceIcon, getServiceBgColor } from '../lib/serviceIcons';
 import EditSubscriptionModal from './EditSubscriptionModal';
 import QuickRenewModal from './QuickRenewModal';
@@ -15,11 +16,14 @@ type SubscriptionCardProps = {
 
 export default function SubscriptionCard({ subscription, onDelete, onUpdate, index = 0 }: SubscriptionCardProps) {
   const { t, formatCurrency, formatDate } = usePreferences();
+  const { user } = useAuth();
   const [showEdit, setShowEdit] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRenew, setShowRenew] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateSuccess, setDuplicateSuccess] = useState(false);
 
   const serviceIcon = getServiceIcon(subscription.service_name);
 
@@ -107,6 +111,51 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
   const hasAdvancedInfo = subscription.subscription_email || subscription.phone_number ||
     subscription.cancellation_url || subscription.cancellation_steps || subscription.description;
 
+  const handleDuplicate = async () => {
+    if (!user || duplicating) return;
+    
+    setDuplicating(true);
+    try {
+      const { error } = await supabase.from('subscriptions').insert({
+        user_id: user.id,
+        service_name: `${subscription.service_name} (Copy)`,
+        category: subscription.category,
+        plan_name: subscription.plan_name,
+        price: subscription.price,
+        currency: subscription.currency,
+        billing_cycle: subscription.billing_cycle,
+        start_date: new Date().toISOString().split('T')[0],
+        next_billing_date: subscription.next_billing_date,
+        payment_method: subscription.payment_method,
+        status: subscription.status,
+        auto_renew: subscription.auto_renew,
+        notes: subscription.notes,
+        is_shared: subscription.is_shared,
+        shared_with_count: subscription.shared_with_count,
+        paid_by_company: subscription.paid_by_company,
+        icon_emoji: subscription.icon_emoji,
+        tags: subscription.tags,
+        description: subscription.description,
+        subscription_email: subscription.subscription_email,
+        phone_number: subscription.phone_number,
+        cancellation_url: subscription.cancellation_url,
+        cancellation_steps: subscription.cancellation_steps,
+        reminder_days: subscription.reminder_days,
+        notification_time: subscription.notification_time,
+      });
+
+      if (error) throw error;
+      
+      setDuplicateSuccess(true);
+      setTimeout(() => setDuplicateSuccess(false), 2000);
+      onUpdate();
+    } catch (err) {
+      console.error('Failed to duplicate subscription:', err);
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   return (
     <>
       <div 
@@ -177,6 +226,24 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
                 aria-label="Quick renew subscription"
               >
                 <Calendar className="w-5 h-5 sm:w-4 sm:h-4" />
+              </button>
+              <button
+                onClick={handleDuplicate}
+                disabled={duplicating}
+                className={`p-2.5 sm:p-2 rounded-lg transition-all duration-200 touch-manipulation hover:scale-110 active:scale-95
+                  ${duplicateSuccess 
+                    ? 'text-green-600 bg-green-100' 
+                    : 'text-slate-500 hover:text-purple-600 hover:bg-purple-100'
+                  } ${duplicating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                aria-label="Duplicate subscription"
+              >
+                {duplicating ? (
+                  <div className="w-5 h-5 sm:w-4 sm:h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
+                ) : duplicateSuccess ? (
+                  <Check className="w-5 h-5 sm:w-4 sm:h-4" />
+                ) : (
+                  <Copy className="w-5 h-5 sm:w-4 sm:h-4" />
+                )}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
