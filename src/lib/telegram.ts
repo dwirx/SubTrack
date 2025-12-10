@@ -6,6 +6,12 @@ const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'Had
 
 export const TELEGRAM_BOT_LINK = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
 
+// Generate deep link for auto-connect (user_id passed to bot via start parameter)
+export function getTelegramDeepLink(userId: string): string {
+  // Telegram deep link format: https://t.me/BotUsername?start=PARAMETER
+  return `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${userId}`;
+}
+
 export type TelegramMessage = {
   chat_id: string | number;
   text: string;

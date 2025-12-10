@@ -3,7 +3,7 @@ import { ArrowLeft, User, Globe, Bell, Check, Palette, Send, Unlink } from 'luci
 import { useAuth } from '../contexts/AuthContext';
 import { usePreferences } from '../contexts/PreferencesContext';
 import { CURRENCIES } from '../lib/supabase';
-import { TELEGRAM_BOT_LINK, sendWelcomeMessage, sendTestMessage } from '../lib/telegram';
+import { getTelegramDeepLink, sendWelcomeMessage, sendTestMessage } from '../lib/telegram';
 
 type UserProfileProps = {
   onBack: () => void;
@@ -57,14 +57,24 @@ export default function UserProfile({ onBack }: UserProfileProps) {
   ];
 
   const handleConnectTelegram = () => {
-    // Generate a unique deep link with user info
-    const startParam = user?.id ? `start=${user.id}` : '';
-    const telegramUrl = `${TELEGRAM_BOT_LINK}?${startParam}`;
+    if (!user?.id) return;
+    
+    // Open Telegram with deep link containing user_id
+    const telegramUrl = getTelegramDeepLink(user.id);
     window.open(telegramUrl, '_blank');
     setTelegramConnecting(true);
     
-    // Poll for connection (in real app, use webhook or realtime subscription)
-    // For now, user needs to manually enter chat_id or use bot callback
+    // Start polling for connection status
+    const pollInterval = setInterval(async () => {
+      // Reload preferences to check if telegram was connected via webhook
+      window.location.reload();
+    }, 5000);
+
+    // Stop polling after 2 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      setTelegramConnecting(false);
+    }, 120000);
   };
 
   const handleDisconnectTelegram = async () => {
