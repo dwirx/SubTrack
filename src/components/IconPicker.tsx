@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { X, Search, Smile, Image, Sparkles } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { X, Search, Smile, Image, Sparkles, Clock, Trash2, Copy, Check } from 'lucide-react';
 
 type IconPickerProps = {
   isOpen: boolean;
@@ -7,6 +7,9 @@ type IconPickerProps = {
   onSelect: (icon: string, type: 'emoji' | 'url') => void;
   currentIcon?: string;
 };
+
+const ICON_HISTORY_KEY = 'subscription-tracker-icon-history';
+const MAX_HISTORY_ITEMS = 20;
 
 // Popular emojis for subscriptions
 const EMOJI_CATEGORIES = {
@@ -35,6 +38,51 @@ export default function IconPicker({ isOpen, onClose, onSelect, currentIcon }: I
   const [selectedCategory, setSelectedCategory] = useState('Popular');
   const [customUrl, setCustomUrl] = useState('');
   const [previewError, setPreviewError] = useState(false);
+  const [urlHistory, setUrlHistory] = useState<string[]>([]);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  // Load URL history from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ICON_HISTORY_KEY);
+      if (saved) {
+        setUrlHistory(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to load icon history:', e);
+    }
+  }, [isOpen]);
+
+  // Save URL to history
+  const saveToHistory = (url: string) => {
+    const newHistory = [url, ...urlHistory.filter(u => u !== url)].slice(0, MAX_HISTORY_ITEMS);
+    setUrlHistory(newHistory);
+    localStorage.setItem(ICON_HISTORY_KEY, JSON.stringify(newHistory));
+  };
+
+  // Remove URL from history
+  const removeFromHistory = (url: string) => {
+    const newHistory = urlHistory.filter(u => u !== url);
+    setUrlHistory(newHistory);
+    localStorage.setItem(ICON_HISTORY_KEY, JSON.stringify(newHistory));
+  };
+
+  // Clear all history
+  const clearHistory = () => {
+    setUrlHistory([]);
+    localStorage.removeItem(ICON_HISTORY_KEY);
+  };
+
+  // Copy URL to clipboard
+  const copyToClipboard = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      setTimeout(() => setCopiedUrl(null), 2000);
+    } catch (e) {
+      console.error('Failed to copy:', e);
+    }
+  };
 
   const filteredEmojis = useMemo(() => {
     if (searchTerm) {
@@ -52,9 +100,16 @@ export default function IconPicker({ isOpen, onClose, onSelect, currentIcon }: I
 
   const handleUrlSubmit = () => {
     if (customUrl.trim()) {
+      saveToHistory(customUrl.trim());
       onSelect(customUrl.trim(), 'url');
       onClose();
     }
+  };
+
+  const handleHistorySelect = (url: string) => {
+    saveToHistory(url); // Move to top of history
+    onSelect(url, 'url');
+    onClose();
   };
 
   return (
@@ -207,6 +262,73 @@ export default function IconPicker({ isOpen, onClose, onSelect, currentIcon }: I
               >
                 Gunakan Image Ini
               </button>
+
+              {/* URL History */}
+              {urlHistory.length > 0 && (
+                <div className="border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <Clock className="w-4 h-4" />
+                      <span>Icon Terakhir Digunakan</span>
+                    </div>
+                    <button
+                      onClick={clearHistory}
+                      className="text-xs text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      Hapus Semua
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {urlHistory.map((url, index) => (
+                      <div
+                        key={`${url}-${index}`}
+                        className="relative group"
+                      >
+                        <button
+                          onClick={() => handleHistorySelect(url)}
+                          className="w-full aspect-square bg-white border border-slate-200 rounded-xl p-1.5 hover:border-purple-400 hover:bg-purple-50 transition-all overflow-hidden"
+                        >
+                          <img
+                            src={url}
+                            alt="Saved icon"
+                            className="w-full h-full object-contain rounded-lg"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23ccc" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+                            }}
+                          />
+                        </button>
+                        {/* Action buttons on hover */}
+                        <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(url);
+                            }}
+                            className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors shadow-sm"
+                            title="Copy URL"
+                          >
+                            {copiedUrl === url ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFromHistory(url);
+                            }}
+                            className="w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm"
+                            title="Hapus dari history"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-amber-50 p-3 rounded-lg">
                 <p className="text-xs text-amber-700">
