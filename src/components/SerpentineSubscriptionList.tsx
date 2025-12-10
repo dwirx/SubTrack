@@ -74,10 +74,30 @@ export default function SerpentineSubscriptionList({
     return colors[category] || colors.Other;
   };
 
-  const getCategoryIcon = (category: string, emoji?: string) => {
-    if (emoji) return emoji;
+  const renderIcon = (category: string, iconEmoji?: string) => {
+    // Handle URL-based icons
+    if (iconEmoji?.startsWith('url:')) {
+      const url = iconEmoji.replace('url:', '');
+      return (
+        <img 
+          src={url} 
+          alt="icon" 
+          className="w-10 h-10 object-contain rounded-lg"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      );
+    }
+    
+    // Handle emoji icons
+    if (iconEmoji) {
+      return <span className="text-4xl">{iconEmoji}</span>;
+    }
+    
+    // Default category emoji
     const cat = CATEGORIES.find(c => c.value === category);
-    return cat?.emoji || '📦';
+    return <span className="text-4xl">{cat?.emoji || '📦'}</span>;
   };
 
   const getCurrencySymbol = (code: string) => {
@@ -175,14 +195,14 @@ export default function SerpentineSubscriptionList({
                   <div className="p-5 md:p-6">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <span
-                          className="text-4xl"
+                        <div
+                          className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/50 flex-shrink-0"
                           role="img"
                           aria-label={sub.category}
                         >
-                          {getCategoryIcon(sub.category, sub.icon_emoji)}
-                        </span>
-                        <div>
+                          {renderIcon(sub.category, sub.icon_emoji)}
+                        </div>
+                        <div className="min-w-0 flex-1">
                           {isEditing ? (
                             <input
                               type="text"
@@ -192,7 +212,7 @@ export default function SerpentineSubscriptionList({
                               aria-label="Service name"
                             />
                           ) : (
-                            <h3 className="text-lg font-bold text-slate-900">
+                            <h3 className="text-lg font-bold text-slate-900 truncate">
                               {sub.service_name}
                             </h3>
                           )}
