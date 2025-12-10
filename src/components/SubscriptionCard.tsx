@@ -24,8 +24,32 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
   const [isHovered, setIsHovered] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateSuccess, setDuplicateSuccess] = useState(false);
+  const [iconCopied, setIconCopied] = useState(false);
 
   const serviceIcon = getServiceIcon(subscription.service_name);
+
+  // Copy icon URL to clipboard and save to history
+  const handleCopyIcon = async () => {
+    if (!subscription.icon_emoji?.startsWith('url:')) return;
+    
+    const url = subscription.icon_emoji.replace('url:', '');
+    try {
+      await navigator.clipboard.writeText(url);
+      
+      // Save to icon history in localStorage
+      const ICON_HISTORY_KEY = 'subscription-tracker-icon-history';
+      const MAX_HISTORY_ITEMS = 20;
+      const saved = localStorage.getItem(ICON_HISTORY_KEY);
+      const history: string[] = saved ? JSON.parse(saved) : [];
+      const newHistory = [url, ...history.filter(u => u !== url)].slice(0, MAX_HISTORY_ITEMS);
+      localStorage.setItem(ICON_HISTORY_KEY, JSON.stringify(newHistory));
+      
+      setIconCopied(true);
+      setTimeout(() => setIconCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy icon URL:', err);
+    }
+  };
 
   const getIconContent = () => {
     // Check if icon is a URL
@@ -175,9 +199,20 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start justify-between gap-3 mb-4">
             <div className="flex items-center space-x-3 min-w-0 flex-1">
-              <div className={`relative w-12 h-12 sm:w-14 sm:h-14 ${getCategoryColor()} rounded-xl flex items-center justify-center 
-                text-2xl sm:text-3xl shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-500`}>
+              <div 
+                className={`relative w-12 h-12 sm:w-14 sm:h-14 ${getCategoryColor()} rounded-xl flex items-center justify-center 
+                  text-2xl sm:text-3xl shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-500
+                  ${subscription.icon_emoji?.startsWith('url:') ? 'cursor-pointer hover:ring-2 hover:ring-cyan-400 hover:ring-offset-2' : ''}`}
+                onClick={subscription.icon_emoji?.startsWith('url:') ? handleCopyIcon : undefined}
+                title={subscription.icon_emoji?.startsWith('url:') ? 'Klik untuk copy icon URL' : undefined}
+              >
                 {getIconContent()}
+                {/* Copy indicator */}
+                {iconCopied && (
+                  <div className="absolute inset-0 bg-green-500/90 rounded-xl flex items-center justify-center animate-fade-in">
+                    <Check className="w-6 h-6 text-white" />
+                  </div>
+                )}
                 {/* Glow effect */}
                 <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${getCategoryGradient()} opacity-0 
                   group-hover:opacity-20 transition-opacity duration-500 blur-sm`} />
@@ -236,6 +271,7 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
                     : 'text-slate-500 hover:text-purple-600 hover:bg-purple-100'
                   } ${duplicating ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Duplicate subscription"
+                title="Duplikasi"
               >
                 {duplicating ? (
                   <div className="w-5 h-5 sm:w-4 sm:h-4 border-2 border-purple-300 border-t-purple-600 rounded-full animate-spin" />
@@ -245,11 +281,13 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
                   <Copy className="w-5 h-5 sm:w-4 sm:h-4" />
                 )}
               </button>
+
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 className="p-2.5 sm:p-2 text-slate-500 hover:text-red-600 hover:bg-red-100 rounded-lg 
                   transition-all duration-200 touch-manipulation hover:scale-110 active:scale-95"
                 aria-label="Delete subscription"
+                title="Hapus"
               >
                 <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
