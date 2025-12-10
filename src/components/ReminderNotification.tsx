@@ -131,7 +131,20 @@ export default function ReminderNotification({ isOpen, onClose }: ReminderNotifi
                       <div className="mt-0.5">{getUrgencyIcon(sub.daysUntilBilling)}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          {sub.icon_emoji && <span className="text-2xl">{sub.icon_emoji}</span>}
+                          {sub.icon_emoji && (
+                            sub.icon_emoji.startsWith('url:') ? (
+                              <img 
+                                src={sub.icon_emoji.replace('url:', '')} 
+                                alt={sub.service_name}
+                                className="w-8 h-8 object-contain rounded-lg"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <span className="text-2xl">{sub.icon_emoji}</span>
+                            )
+                          )}
                           <h3 className="font-bold text-lg truncate text-slate-900">{sub.service_name}</h3>
                         </div>
                         {sub.plan_name && <p className="text-sm text-slate-600 mb-2">{sub.plan_name}</p>}
