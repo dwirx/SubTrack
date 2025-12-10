@@ -1,0 +1,33 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Jalan setiap 5 hari pada jam 00:00 UTC
+    - cron: '0 0 */5 * *'
+  workflow_dispatch:
+    # Bisa trigger manual dari GitHub Actions tab
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          echo "🔄 Pinging Supabase to keep it alive..."
+          
+          # Ping user_preferences table
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/user_preferences?select=count&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Supabase is alive! Response: $RESPONSE"
+          else
+            echo "⚠️ Unexpected response: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Log Success
+        run: |
+          echo "🎉 Keep-alive ping completed at $(date -u)"
