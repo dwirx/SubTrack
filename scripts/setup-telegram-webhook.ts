@@ -57,23 +57,21 @@ async function getWebhookInfo() {
   return result;
 }
 
-async function deleteWebhook() {
-  console.log('🗑️ Deleting webhook...');
-
-  const response = await fetch(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drop_pending_updates: true }),
-    }
-  );
-
-  const result = await response.json();
-  console.log('Delete result:', result);
-
-  return result;
-}
+// Delete webhook (uncomment if needed)
+// async function deleteWebhook() {
+//   console.log('🗑️ Deleting webhook...');
+//   const response = await fetch(
+//     `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook`,
+//     {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({ drop_pending_updates: true }),
+//     }
+//   );
+//   const result = await response.json();
+//   console.log('Delete result:', result);
+//   return result;
+// }
 
 async function getBotInfo() {
   console.log('\n🤖 Getting bot info...');

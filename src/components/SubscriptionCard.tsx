@@ -23,10 +23,26 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
 
   const serviceIcon = getServiceIcon(subscription.service_name);
 
-  const getCategoryIcon = (category: string) => {
+  const getIconContent = () => {
+    // Check if icon is a URL
+    if (subscription.icon_emoji?.startsWith('url:')) {
+      const url = subscription.icon_emoji.replace('url:', '');
+      return (
+        <img src={url} alt={subscription.service_name} className="w-8 h-8 object-contain rounded" />
+      );
+    }
+    
+    // Check if we have a custom emoji
+    if (subscription.icon_emoji) {
+      return subscription.icon_emoji;
+    }
+    
+    // Check service icon
     if (serviceIcon) {
       return serviceIcon.icon;
     }
+    
+    // Default category icons
     const icons: Record<string, string> = {
       Entertainment: '🎬',
       Productivity: '📝',
@@ -34,9 +50,10 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
       Gaming: '🎮',
       Reading: '📚',
       Fitness: '🏃',
+      Domain: '🌐',
       Other: '📦',
     };
-    return subscription.icon_emoji || icons[category] || '📦';
+    return icons[subscription.category] || '📦';
   };
 
   const getCategoryColor = () => {
@@ -111,7 +128,7 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
             <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div className={`relative w-12 h-12 sm:w-14 sm:h-14 ${getCategoryColor()} rounded-xl flex items-center justify-center 
                 text-2xl sm:text-3xl shadow-sm flex-shrink-0 group-hover:scale-110 transition-transform duration-500`}>
-                {getCategoryIcon(subscription.category)}
+                {getIconContent()}
                 {/* Glow effect */}
                 <div className={`absolute inset-0 rounded-xl bg-gradient-to-br ${getCategoryGradient()} opacity-0 
                   group-hover:opacity-20 transition-opacity duration-500 blur-sm`} />

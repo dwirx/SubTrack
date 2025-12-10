@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { X, ChevronDown, ChevronUp, Bell, Mail, Phone, Link2, ListOrdered, Clock, Search, Sparkles, ArrowLeft } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Bell, Mail, Phone, Link2, ListOrdered, Clock, Search, Sparkles, ArrowLeft, Smile } from 'lucide-react';
+import IconPicker from './IconPicker';
 import { supabase, CURRENCIES, CATEGORIES, REMINDER_OPTIONS } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { usePreferences } from '../contexts/PreferencesContext';
@@ -239,9 +240,20 @@ const SubscriptionForm = memo(({ formData, setFormData, showAdvanced, setShowAdv
   onSuccess: () => void;
   onClose: () => void;
 }) => {
+  const [showIconPicker, setShowIconPicker] = useState(false);
+
   const updateField = useCallback(<K extends keyof FormDataType>(key: K, value: FormDataType[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
   }, [setFormData]);
+
+  const handleIconSelect = useCallback((icon: string, type: 'emoji' | 'url') => {
+    if (type === 'emoji') {
+      updateField('icon_emoji', icon);
+    } else {
+      // For URL, we store it in icon_emoji field with a prefix
+      updateField('icon_emoji', `url:${icon}`);
+    }
+  }, [updateField]);
 
   const toggleReminder = useCallback((day: number) => {
     setFormData(prev => ({
@@ -313,12 +325,31 @@ const SubscriptionForm = memo(({ formData, setFormData, showAdvanced, setShowAdv
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1.5">Service Name *</label>
         <div className="flex gap-2">
-          <input type="text" value={formData.icon_emoji || '📦'} onChange={(e) => updateField('icon_emoji', e.target.value)}
-            className="w-12 py-2.5 border border-slate-200 rounded-xl text-xl text-center" maxLength={2} />
+          <button
+            type="button"
+            onClick={() => setShowIconPicker(true)}
+            className="w-12 h-12 border border-slate-200 rounded-xl text-xl flex items-center justify-center hover:border-teal-400 hover:bg-teal-50/50 transition-all group"
+            title="Pilih icon"
+          >
+            {formData.icon_emoji?.startsWith('url:') ? (
+              <img src={formData.icon_emoji.replace('url:', '')} alt="icon" className="w-8 h-8 object-contain rounded" />
+            ) : (
+              <span>{formData.icon_emoji || '📦'}</span>
+            )}
+            <Smile className="w-3 h-3 text-slate-400 absolute -bottom-0.5 -right-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </button>
           <input type="text" required value={formData.service_name} onChange={(e) => updateField('service_name', e.target.value)}
             className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500" placeholder="Service name" />
         </div>
       </div>
+
+      {/* Icon Picker Modal */}
+      <IconPicker
+        isOpen={showIconPicker}
+        onClose={() => setShowIconPicker(false)}
+        onSelect={handleIconSelect}
+        currentIcon={formData.icon_emoji?.startsWith('url:') ? undefined : formData.icon_emoji}
+      />
 
       {/* Amount and Currency */}
       <div className="grid grid-cols-5 gap-2">

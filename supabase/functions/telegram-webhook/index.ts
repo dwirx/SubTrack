@@ -77,15 +77,7 @@ function getCategoryEmoji(category: string): string {
   return emojis[category] || '📦';
 }
 
-// Get status emoji
-function getStatusEmoji(status: string): string {
-  const emojis: Record<string, string> = {
-    'active': '✅',
-    'trial': '🆓',
-    'cancelled': '❌',
-  };
-  return emojis[status] || '❓';
-}
+
 
 // Send message to Telegram
 async function sendTelegramMessage(chatId: number | string, text: string, parseMode = 'Markdown') {
