@@ -21,6 +21,12 @@ Subscription Manager sekarang mendukung PWA, yang memungkinkan aplikasi diinstal
 - Load instan setelah install
 - Background sync untuk update
 
+### 4. Push Notifications (Android & iOS)
+- Reminder sebelum tanggal billing
+- Notifikasi trial expiration
+- Notifikasi perubahan harga
+- Klik tombol Settings (⚙️) di header untuk mengaktifkan
+
 ## Cara Install
 
 ### Di Android (Chrome)
@@ -142,3 +148,39 @@ npm run preview
 2. Centang "Offline"
 3. Refresh halaman
 4. Aplikasi harus tetap bisa diakses
+
+
+## Push Notifications
+
+### Mengaktifkan Push Notifications
+1. Buka aplikasi
+2. Klik tombol Settings (⚙️) di header
+3. Klik "Allow" untuk memberikan izin notifikasi
+4. Toggle "Push Notifications" ke ON
+5. Klik "Send Test Notification" untuk test
+
+### Platform Support
+
+#### Android (Chrome)
+- Full support untuk push notifications
+- Notifikasi muncul di notification tray
+- Bisa diklik untuk membuka app
+
+#### iOS (Safari 16.4+)
+- Harus install PWA terlebih dahulu
+- Buka Settings → Notifications → SubsManager
+- Enable notifications
+
+### Troubleshooting Notifications
+
+#### Notifikasi tidak muncul
+1. Pastikan permission sudah "granted"
+2. Cek Settings → Notifications di device
+3. Pastikan Do Not Disturb tidak aktif
+4. Untuk iOS: pastikan app sudah diinstall sebagai PWA
+
+#### Permission "denied"
+1. Buka browser settings
+2. Cari site permissions
+3. Ubah Notifications ke "Allow"
+4. Refresh halaman

@@ -1,21 +1,38 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Globe, Bell, Check, Palette, Send, Unlink } from 'lucide-react';
+import { ArrowLeft, User, Globe, Bell, Check, Palette, Send, Unlink, Download, Upload, Smartphone, BellRing } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePreferences } from '../contexts/PreferencesContext';
-import { CURRENCIES } from '../lib/supabase';
+import { CURRENCIES, Subscription } from '../lib/supabase';
 import { getTelegramDeepLink, sendWelcomeMessage, sendTestMessage } from '../lib/telegram';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import ExportImportModal from './ExportImportModal';
 
 type UserProfileProps = {
   onBack: () => void;
+  subscriptions?: Subscription[];
+  onSubscriptionsUpdate?: () => void;
 };
 
-export default function UserProfile({ onBack }: UserProfileProps) {
+export default function UserProfile({ onBack, subscriptions = [], onSubscriptionsUpdate }: UserProfileProps) {
   const { user } = useAuth();
   const { preferences, updatePreferences, connectTelegram, disconnectTelegram, t } = usePreferences();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [telegramConnecting, setTelegramConnecting] = useState(false);
   const [telegramTestSent, setTelegramTestSent] = useState(false);
+  const [showExportImportModal, setShowExportImportModal] = useState(false);
+  
+  // Push notifications
+  const {
+    isSupported: pushSupported,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    requestPermission: requestPushPermission,
+    subscribe: subscribePush,
+    unsubscribe: unsubscribePush,
+    sendTestNotification,
+  } = usePushNotifications();
   const [formData, setFormData] = useState({
     displayName: preferences.displayName,
     language: preferences.language,
@@ -467,6 +484,134 @@ export default function UserProfile({ onBack }: UserProfileProps) {
             </div>
           </section>
 
+          {/* Push Notifications Section */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Push Notifications</h2>
+                  <p className="text-sm text-slate-500">Get reminders on your device (Android & iOS)</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {!pushSupported ? (
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    Push notifications are not supported in your browser. Try using Chrome or Safari.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Permission Status */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${
+                        pushPermission === 'granted' ? 'bg-green-500' : 
+                        pushPermission === 'denied' ? 'bg-red-500' : 'bg-amber-500'
+                      }`} />
+                      <div>
+                        <p className="font-medium text-slate-900">Permission Status</p>
+                        <p className="text-sm text-slate-500 capitalize">{pushPermission}</p>
+                      </div>
+                    </div>
+                    {pushPermission === 'default' && (
+                      <button
+                        onClick={requestPushPermission}
+                        disabled={pushLoading}
+                        className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                      >
+                        Allow
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Push Toggle */}
+                  {pushPermission === 'granted' && (
+                    <label className="flex items-center justify-between cursor-pointer p-4 bg-slate-50 rounded-xl">
+                      <div>
+                        <p className="font-medium text-slate-900">Push Notifications</p>
+                        <p className="text-sm text-slate-500">
+                          {pushSubscribed ? 'Enabled - You will receive reminders' : 'Disabled'}
+                        </p>
+                      </div>
+                      <div
+                        onClick={() => pushSubscribed ? unsubscribePush() : subscribePush()}
+                        className={`w-14 h-8 rounded-full transition-colors cursor-pointer ${
+                          pushSubscribed ? 'bg-teal-500' : 'bg-slate-300'
+                        } ${pushLoading ? 'opacity-50' : ''}`}
+                      >
+                        <div className={`w-6 h-6 bg-white rounded-full shadow-sm transform transition-transform mt-1 ${
+                          pushSubscribed ? 'translate-x-7' : 'translate-x-1'
+                        }`} />
+                      </div>
+                    </label>
+                  )}
+
+                  {/* Test Notification */}
+                  {pushPermission === 'granted' && pushSubscribed && (
+                    <button
+                      onClick={sendTestNotification}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors"
+                    >
+                      <BellRing className="w-5 h-5" />
+                      Send Test Notification
+                    </button>
+                  )}
+
+                  {/* Denied Help */}
+                  {pushPermission === 'denied' && (
+                    <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+                      <p className="text-sm font-medium text-red-800 mb-2">Notifications Blocked</p>
+                      <p className="text-xs text-red-700">
+                        To enable notifications, click the lock icon in your browser's address bar and allow notifications.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Export/Import Section */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Download className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Data Management</h2>
+                  <p className="text-sm text-slate-500">Export or import your subscription data</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setShowExportImportModal(true)}
+                  className="flex items-center justify-center gap-3 p-4 bg-indigo-50 text-indigo-700 rounded-xl hover:bg-indigo-100 transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  <span className="font-medium">Export Data</span>
+                </button>
+                <button
+                  onClick={() => setShowExportImportModal(true)}
+                  className="flex items-center justify-center gap-3 p-4 bg-teal-50 text-teal-700 rounded-xl hover:bg-teal-100 transition-colors"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="font-medium">Import Data</span>
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-3 text-center">
+                Export your subscriptions as JSON or CSV, or import from a backup file.
+              </p>
+            </div>
+          </section>
+
           <div className="flex items-center justify-end gap-4 pt-4">
             {saved && (
               <div className="flex items-center gap-2 text-green-600">
@@ -491,6 +636,17 @@ export default function UserProfile({ onBack }: UserProfileProps) {
           </div>
         </div>
       </div>
+
+      {/* Export/Import Modal */}
+      <ExportImportModal
+        isOpen={showExportImportModal}
+        onClose={() => setShowExportImportModal(false)}
+        onSuccess={() => {
+          setShowExportImportModal(false);
+          onSubscriptionsUpdate?.();
+        }}
+        subscriptions={subscriptions}
+      />
     </div>
   );
 }

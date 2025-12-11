@@ -103,12 +103,46 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
   };
 
   const getBillingProgress = () => {
-    if (!subscription.start_date || !subscription.next_billing_date) return 0;
-    const start = new Date(subscription.start_date).getTime();
+    if (!subscription.next_billing_date) return 0;
+    
     const end = new Date(subscription.next_billing_date).getTime();
     const now = Date.now();
+    
+    // Calculate cycle duration based on billing_cycle
+    let cycleDays = 30; // default monthly
+    switch (subscription.billing_cycle) {
+      case 'weekly':
+        cycleDays = 7;
+        break;
+      case 'monthly':
+        cycleDays = 30;
+        break;
+      case 'quarterly':
+        cycleDays = 90;
+        break;
+      case 'yearly':
+        cycleDays = 365;
+        break;
+    }
+    
+    // If we have start_date, use it; otherwise calculate from billing cycle
+    let start: number;
+    if (subscription.start_date) {
+      const startDate = new Date(subscription.start_date).getTime();
+      // If start_date is too old, calculate the most recent cycle start
+      const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
+      const cyclesSinceStart = Math.floor((end - startDate) / cycleMs);
+      start = end - cycleMs; // Start of current cycle
+    } else {
+      // Calculate start based on billing cycle
+      start = end - (cycleDays * 24 * 60 * 60 * 1000);
+    }
+    
     const total = end - start;
     const elapsed = now - start;
+    
+    // Ensure we return a valid percentage
+    if (total <= 0) return 0;
     return Math.min(100, Math.max(0, (elapsed / total) * 100));
   };
 
