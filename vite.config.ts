@@ -10,13 +10,16 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icons/*.png'],
       manifest: {
-        name: 'Subscription Manager',
-        short_name: 'SubsManager',
-        description: 'Track and manage all your subscriptions in one place',
-        theme_color: '#6366f1',
-        background_color: '#ffffff',
+        name: 'SubTrack - Subscription Manager',
+        short_name: 'SubTrack',
+        description: 'Track and manage all your subscriptions in one place. Never miss a payment or renewal date again.',
+        theme_color: '#0d9488',
+        background_color: '#f8fafc',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/',
+        scope: '/',
+        categories: ['finance', 'productivity', 'utilities'],
         icons: [
           {
             src: 'icons/icon-72x72.png',
