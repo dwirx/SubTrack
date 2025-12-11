@@ -2,6 +2,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PreferencesProvider } from './contexts/PreferencesContext';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
+import { InstallPrompt } from './components/InstallPrompt';
+import { UpdateNotification } from './components/UpdateNotification';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { CreditCard, Sparkles } from 'lucide-react';
 
 function AppContent() {
@@ -47,6 +50,9 @@ function App() {
     <AuthProvider>
       <PreferencesProvider>
         <AppContent />
+        <InstallPrompt />
+        <UpdateNotification />
+        <OfflineIndicator />
       </PreferencesProvider>
     </AuthProvider>
   );
