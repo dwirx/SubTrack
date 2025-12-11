@@ -51,7 +51,7 @@ export default function UserProfile({ onBack, subscriptions = [], onSubscription
       displayName: formData.displayName,
       language: formData.language as 'en' | 'id',
       defaultCurrency: formData.defaultCurrency,
-      dateFormat: formData.dateFormat as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD',
+      dateFormat: formData.dateFormat as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD MMMM YYYY',
       theme: formData.theme as 'light' | 'dark' | 'system',
       emailNotifications: formData.emailNotifications,
       telegramNotifications: formData.telegramNotifications,
@@ -71,6 +71,7 @@ export default function UserProfile({ onBack, subscriptions = [], onSubscription
     { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (12/31/2024)' },
     { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (31/12/2024)' },
     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (2024-12-31)' },
+    { value: 'DD MMMM YYYY', label: preferences.language === 'id' ? 'DD MMMM YYYY (31 Desember 2024)' : 'DD MMMM YYYY (31 December 2024)' },
   ];
 
   const handleConnectTelegram = () => {
@@ -248,7 +249,7 @@ export default function UserProfile({ onBack, subscriptions = [], onSubscription
                 </label>
                 <select
                   value={formData.dateFormat}
-                  onChange={(e) => setFormData({ ...formData, dateFormat: e.target.value as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' })}
+                  onChange={(e) => setFormData({ ...formData, dateFormat: e.target.value as 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD MMMM YYYY' })}
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
                 >
                   {dateFormats.map((format) => (

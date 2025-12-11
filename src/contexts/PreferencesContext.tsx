@@ -3,7 +3,7 @@ import { supabase, CURRENCIES } from '../lib/supabase';
 import { Language, translations, getNestedTranslation } from '../lib/i18n';
 import { useAuth } from './AuthContext';
 
-type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
+type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD MMMM YYYY';
 type Theme = 'light' | 'dark' | 'system';
 
 type UserPreferences = {
@@ -232,6 +232,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         });
       case 'YYYY-MM-DD':
         return date.toISOString().split('T')[0];
+      case 'DD MMMM YYYY':
+        return date.toLocaleDateString(locale, {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
       case 'MM/DD/YYYY':
       default:
         return date.toLocaleDateString(locale, {

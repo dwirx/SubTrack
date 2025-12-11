@@ -104,46 +104,76 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
 
   const getBillingProgress = () => {
     if (!subscription.next_billing_date) return 0;
-    
-    const end = new Date(subscription.next_billing_date).getTime();
-    const now = Date.now();
-    
+
+    // Get current date (normalized to start of day)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get next billing date (normalized to start of day)
+    const nextBilling = new Date(subscription.next_billing_date);
+    nextBilling.setHours(0, 0, 0, 0);
+
+    // Calculate days until next billing
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysUntilBilling = Math.round(
+      (nextBilling.getTime() - today.getTime()) / msPerDay
+    );
+
     // Calculate cycle duration based on billing_cycle
+    const billingCycle = subscription.billing_cycle as string;
     let cycleDays = 30; // default monthly
-    switch (subscription.billing_cycle) {
-      case 'weekly':
-        cycleDays = 7;
-        break;
-      case 'monthly':
-        cycleDays = 30;
-        break;
-      case 'quarterly':
-        cycleDays = 90;
-        break;
-      case 'yearly':
-        cycleDays = 365;
-        break;
+
+    if (billingCycle === 'weekly') {
+      cycleDays = 7;
+    } else if (billingCycle === 'monthly') {
+      cycleDays = 30;
+    } else if (billingCycle === 'quarterly') {
+      cycleDays = 90;
+    } else if (billingCycle === 'yearly') {
+      cycleDays = 365;
+    } else if (billingCycle === 'once') {
+      return daysUntilBilling <= 0 ? 100 : 0;
     }
-    
-    // If we have start_date, use it; otherwise calculate from billing cycle
-    let start: number;
+
+    // If past due, return 100%
+    if (daysUntilBilling <= 0) return 100;
+
+    // If days until billing is within one cycle, simple calculation
+    if (daysUntilBilling <= cycleDays) {
+      // Days elapsed in current cycle = cycleDays - daysUntilBilling
+      const daysElapsed = cycleDays - daysUntilBilling;
+      return Math.round((daysElapsed / cycleDays) * 100);
+    }
+
+    // For multi-cycle scenarios (next billing is far in future)
+    // Use start_date if available for accurate calculation
     if (subscription.start_date) {
-      const startDate = new Date(subscription.start_date).getTime();
-      // If start_date is too old, calculate the most recent cycle start
-      const cycleMs = cycleDays * 24 * 60 * 60 * 1000;
-      const cyclesSinceStart = Math.floor((end - startDate) / cycleMs);
-      start = end - cycleMs; // Start of current cycle
-    } else {
-      // Calculate start based on billing cycle
-      start = end - (cycleDays * 24 * 60 * 60 * 1000);
+      // Parse start_date - handle both YYYY-MM-DD and other formats
+      const startDate = new Date(subscription.start_date);
+      startDate.setHours(0, 0, 0, 0);
+
+      // Days since subscription started
+      const daysSinceStart = Math.round(
+        (today.getTime() - startDate.getTime()) / msPerDay
+      );
+
+      // If we haven't started yet, return 0
+      if (daysSinceStart < 0) return 0;
+
+      // Days elapsed in current cycle (using modulo)
+      const daysInCurrentCycle = daysSinceStart % cycleDays;
+
+      return Math.round((daysInCurrentCycle / cycleDays) * 100);
     }
-    
-    const total = end - start;
-    const elapsed = now - start;
-    
-    // Ensure we return a valid percentage
-    if (total <= 0) return 0;
-    return Math.min(100, Math.max(0, (elapsed / total) * 100));
+
+    // Fallback for multi-cycle without start_date
+    // Use modulo to find position in current cycle
+    const daysIntoCurrentCycle = cycleDays - (daysUntilBilling % cycleDays);
+
+    // Handle edge case where modulo is exactly cycleDays
+    if (daysIntoCurrentCycle === cycleDays) return 0;
+
+    return Math.round((daysIntoCurrentCycle / cycleDays) * 100);
   };
 
   const getDaysUntilBilling = () => {
@@ -380,24 +410,23 @@ export default function SubscriptionCard({ subscription, onDelete, onUpdate, ind
                   )}
                 </div>
               </div>
-              {subscription.start_date && (
-                <div className="bg-slate-50 px-3 py-2.5">
-                  <div className="flex items-center justify-between text-xs text-slate-600 mb-1.5">
-                    <span>{t('card.cycleProgress')}</span>
-                    <span className="font-medium">{Math.round(getBillingProgress())}%</span>
-                  </div>
-                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        getBillingProgress() >= 90 ? 'bg-gradient-to-r from-red-500 to-rose-500' :
-                        getBillingProgress() >= 70 ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
-                        'bg-gradient-to-r from-teal-500 to-cyan-500'
-                      }`}
-                      style={{ width: `${getBillingProgress()}%` }}
-                    />
-                  </div>
+              {/* Cycle Progress - always show when next_billing_date exists */}
+              <div className="bg-slate-50 px-3 py-2.5">
+                <div className="flex items-center justify-between text-xs text-slate-600 mb-1.5">
+                  <span>{t('card.cycleProgress')}</span>
+                  <span className="font-medium">{Math.round(getBillingProgress())}%</span>
                 </div>
-              )}
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                      getBillingProgress() >= 90 ? 'bg-gradient-to-r from-red-500 to-rose-500' :
+                      getBillingProgress() >= 70 ? 'bg-gradient-to-r from-orange-500 to-amber-500' :
+                      'bg-gradient-to-r from-teal-500 to-cyan-500'
+                    }`}
+                    style={{ width: `${getBillingProgress()}%` }}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
