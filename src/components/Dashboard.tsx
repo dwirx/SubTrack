@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Plus, Search, LayoutGrid, GitBranch, ChevronDown, User,
-  Calendar, TrendingUp, LogOut, Moon, Filter, Bell, Sparkles
+  Calendar, TrendingUp, LogOut, Moon, Filter, Bell, Sparkles, Key
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePreferences } from '../contexts/PreferencesContext';
@@ -14,8 +14,9 @@ import AnalyticsView from './AnalyticsView';
 import UserProfile from './UserProfile';
 import CalendarView from './CalendarView';
 import ReminderNotification from './ReminderNotification';
+import ApiManager from './ApiManager';
 
-type View = 'dashboard' | 'analytics' | 'profile' | 'calendar';
+type View = 'dashboard' | 'analytics' | 'profile' | 'calendar' | 'apiManager';
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -145,6 +146,10 @@ export default function Dashboard() {
     );
   }
 
+  if (view === 'apiManager') {
+    return <ApiManager onBack={() => setView('dashboard')} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-teal-50/30">
       {/* Animated background elements */}
@@ -262,6 +267,9 @@ export default function Dashboard() {
                       </MenuButton>
                       <MenuButton icon={TrendingUp} onClick={() => { setView('analytics'); setShowUserMenu(false); }}>
                         {t('nav.analytics')}
+                      </MenuButton>
+                      <MenuButton icon={Key} onClick={() => { setView('apiManager'); setShowUserMenu(false); }}>
+                        API Manager
                       </MenuButton>
                     </div>
                     <div className="border-t border-slate-100 py-1">
