@@ -1,116 +1,247 @@
-import { X, Edit3, Trash2, Pin, Calendar, Clock } from 'lucide-react';
-import { Note, NOTE_COLORS } from '../lib/supabase';
+import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Pin, Trash2, MoreHorizontal, Check } from 'lucide-react';
+import { Note, NoteInput, NOTE_COLORS } from '../lib/supabase';
 
 interface NoteDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   note: Note | null;
-  onEdit: (note: Note) => void;
+  onSave: (note: NoteInput) => Promise<void>;
   onDelete: (id: string) => void;
 }
 
-export default function NoteDetailModal({ isOpen, onClose, note, onEdit, onDelete }: NoteDetailModalProps) {
-  if (!isOpen || !note) return null;
+export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelete }: NoteDetailModalProps) {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [color, setColor] = useState('default');
+  const [isPinned, setIsPinned] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
-  const colorConfig = NOTE_COLORS.find(c => c.value === note.color) || NOTE_COLORS[0];
+  useEffect(() => {
+    if (isOpen && note) {
+      setTitle(note.title);
+      setContent(note.content || '');
+      setColor(note.color || 'default');
+      setIsPinned(note.is_pinned);
+      setHasChanges(false);
+    }
+  }, [note, isOpen]);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+  // Auto-resize textarea
+  const autoResize = (element: HTMLTextAreaElement | null) => {
+    if (element) {
+      element.style.height = 'auto';
+      element.style.height = element.scrollHeight + 'px';
+    }
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  useEffect(() => {
+    autoResize(titleRef.current);
+    autoResize(contentRef.current);
+  }, [title, content, isOpen]);
+
+  const handleSave = async () => {
+    if (!title.trim() || !hasChanges) return;
+    
+    setSaving(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        content: content.trim(),
+        color,
+        is_pinned: isPinned,
+      });
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Failed to save:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEdit = () => {
-    onEdit(note);
+  const handleClose = async () => {
+    if (hasChanges && title.trim()) {
+      await handleSave();
+    }
     onClose();
   };
 
   const handleDelete = () => {
-    onDelete(note.id);
-    onClose();
+    if (note) {
+      setShowMenu(false);
+      onDelete(note.id);
+      onClose();
+    }
   };
 
+  const handleChange = () => {
+    setHasChanges(true);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return `Today, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    } else if (diffDays === 1) {
+      return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  if (!isOpen || !note) return null;
+
+  const selectedColor = NOTE_COLORS.find(c => c.value === color) || NOTE_COLORS[0];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-      
-      <div className={`relative w-full max-w-2xl ${colorConfig.bg} rounded-2xl shadow-2xl animate-scale-in max-h-[90vh] flex flex-col`}>
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-slate-200/50">
-          <div className="flex-1 min-w-0 pr-4">
-            <div className="flex items-center gap-2 mb-1">
-              {note.is_pinned && (
-                <Pin className="w-5 h-5 text-amber-500 fill-amber-500 flex-shrink-0" />
-              )}
-              <h2 className="text-xl font-bold text-slate-900 break-words">{note.title}</h2>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-slate-500 mt-2">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {formatDate(note.created_at)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                {formatTime(note.created_at)}
-              </span>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 bg-[#F2F2F7]">
+      {/* Header */}
+      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl sticky top-0 z-10 border-b border-slate-200/50">
+        <div className="flex items-center justify-between px-2 h-11 safe-area-top">
+          <button
+            onClick={handleClose}
+            className="flex items-center gap-0.5 text-[#007AFF] font-medium text-[17px] px-2 py-1 
+              rounded-lg active:bg-blue-50 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Notes</span>
+          </button>
           
           <div className="flex items-center gap-1">
+            {/* Save indicator */}
+            {saving && (
+              <span className="text-[13px] text-slate-400 mr-2">Saving...</span>
+            )}
+            {hasChanges && !saving && (
+              <button
+                onClick={handleSave}
+                className="text-[#007AFF] font-medium text-[15px] px-3 py-1 rounded-lg 
+                  active:bg-blue-50 transition-colors"
+              >
+                Save
+              </button>
+            )}
+            
+            {/* Pin toggle */}
             <button
-              onClick={handleEdit}
-              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-              title="Edit"
+              onClick={() => {
+                setIsPinned(!isPinned);
+                handleChange();
+              }}
+              className={`p-2 rounded-lg transition-colors ${
+                isPinned ? 'text-amber-500' : 'text-[#007AFF]'
+              } active:bg-slate-100`}
             >
-              <Edit3 className="w-5 h-5" />
+              <Pin className={`w-5 h-5 ${isPinned ? 'fill-amber-500' : ''}`} />
             </button>
-            <button
-              onClick={handleDelete}
-              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            
+            {/* More menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-2 text-[#007AFF] rounded-lg active:bg-blue-50 transition-colors"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+              
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl 
+                    border border-slate-200 overflow-hidden z-20 animate-scale-in origin-top-right">
+                    
+                    {/* Color picker in menu */}
+                    <div className="px-4 py-3 border-b border-slate-100">
+                      <p className="text-[13px] text-slate-500 mb-2">Note Color</p>
+                      <div className="flex items-center gap-2">
+                        {NOTE_COLORS.map((c) => (
+                          <button
+                            key={c.value}
+                            onClick={() => {
+                              setColor(c.value);
+                              handleChange();
+                            }}
+                            className={`w-7 h-7 rounded-full ${c.bg} ${c.border} border-2 
+                              transition-all flex items-center justify-center
+                              ${color === c.value ? 'ring-2 ring-[#007AFF] ring-offset-1' : ''}`}
+                          >
+                            {color === c.value && <Check className="w-3.5 h-3.5 text-slate-600" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={handleDelete}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 
+                        hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-[15px]">Delete Note</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {note.content ? (
-            <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{note.content}</p>
-          ) : (
-            <p className="text-slate-400 italic">No content</p>
-          )}
+      {/* Content - Full screen editable */}
+      <main className={`min-h-[calc(100vh-44px)] ${selectedColor.bg} transition-colors duration-200`}>
+        <div className="max-w-3xl mx-auto px-4 py-6">
+          {/* Date */}
+          <p className="text-[13px] text-slate-400 text-center mb-4">
+            {formatDate(note.updated_at)}
+          </p>
+          
+          {/* Title - Editable */}
+          <textarea
+            ref={titleRef}
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              handleChange();
+              autoResize(e.target);
+            }}
+            placeholder="Title"
+            className="w-full text-[28px] font-bold text-slate-900 placeholder-slate-300
+              bg-transparent border-none focus:outline-none focus:ring-0 resize-none
+              leading-tight mb-4 overflow-hidden"
+            rows={1}
+          />
+          
+          {/* Content - Editable */}
+          <textarea
+            ref={contentRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              handleChange();
+              autoResize(e.target);
+            }}
+            placeholder="Start typing..."
+            className="w-full text-[17px] text-slate-700 placeholder-slate-400 leading-relaxed
+              bg-transparent border-none focus:outline-none focus:ring-0 resize-none
+              min-h-[50vh] overflow-hidden"
+          />
         </div>
-
-        {/* Footer */}
-        {note.updated_at !== note.created_at && (
-          <div className="px-5 py-3 border-t border-slate-200/50 text-xs text-slate-400">
-            Last updated: {formatDate(note.updated_at)} at {formatTime(note.updated_at)}
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 }

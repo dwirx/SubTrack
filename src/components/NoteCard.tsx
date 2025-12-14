@@ -1,4 +1,4 @@
-import { Edit3, Trash2, Pin } from 'lucide-react';
+import { Trash2, Pin } from 'lucide-react';
 import { Note, NOTE_COLORS } from '../lib/supabase';
 
 interface NoteCardProps {
@@ -10,27 +10,37 @@ interface NoteCardProps {
   index: number;
 }
 
-export default function NoteCard({ note, onEdit, onDelete, onClick, layoutMode, index }: NoteCardProps) {
+export default function NoteCard({ note, onDelete, onClick, layoutMode, index }: NoteCardProps) {
   const colorConfig = NOTE_COLORS.find(c => c.value === note.color) || NOTE_COLORS[0];
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const truncateContent = (content: string, maxLength: number = 150) => {
+  const getFirstLine = (content: string) => {
+    if (!content) return 'No additional text';
+    const firstLine = content.split('\n')[0].trim();
+    if (!firstLine) return 'No additional text';
+    return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine;
+  };
+
+  const getPreview = (content: string, maxLines: number = 3) => {
     if (!content) return '';
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
-  };
-
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit(note);
+    const lines = content.split('\n').filter(l => l.trim()).slice(0, maxLines);
+    return lines.join('\n');
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -38,83 +48,102 @@ export default function NoteCard({ note, onEdit, onDelete, onClick, layoutMode, 
     onDelete(note.id);
   };
 
+  // List layout
   if (layoutMode === 'list') {
     return (
       <div
         onClick={() => onClick(note)}
-        className={`group ${colorConfig.bg} ${colorConfig.border} border rounded-xl p-4 cursor-pointer
-          transition-all duration-300 hover:shadow-md ${colorConfig.hover} animate-fade-in-up`}
-        style={{ animationDelay: `${index * 50}ms` }}
+        className={`group relative ${colorConfig.bg} cursor-pointer
+          transition-all duration-200 active:bg-slate-50 touch-manipulation px-4 py-3`}
+        style={{ animationDelay: `${index * 20}ms` }}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {note.is_pinned && (
-                <Pin className="w-4 h-4 text-amber-500 fill-amber-500" />
-              )}
-              <h3 className="font-semibold text-slate-900 truncate">{note.title}</h3>
-            </div>
-            <p className="text-sm text-slate-600 line-clamp-2">{truncateContent(note.content, 200)}</p>
-            <p className="text-xs text-slate-400 mt-2">{formatDate(note.created_at)}</p>
-          </div>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={handleEdit}
-              className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-              title="Edit"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleDelete}
-              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Delete"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      onClick={() => onClick(note)}
-      className={`group ${colorConfig.bg} ${colorConfig.border} border rounded-2xl p-5 cursor-pointer
-        transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${colorConfig.hover} animate-fade-in-up`}
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-start gap-3">
+          {/* Pin indicator */}
           {note.is_pinned && (
-            <Pin className="w-4 h-4 text-amber-500 fill-amber-500 flex-shrink-0" />
+            <Pin className="w-4 h-4 text-amber-500 fill-amber-500 flex-shrink-0 mt-0.5" />
           )}
-          <h3 className="font-semibold text-slate-900 truncate">{note.title}</h3>
-        </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleEdit}
-            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50/50 rounded-lg transition-colors"
-            title="Edit"
-          >
-            <Edit3 className="w-4 h-4" />
-          </button>
+          
+          <div className="flex-1 min-w-0">
+            {/* Title */}
+            <h3 className="font-semibold text-slate-900 text-[15px] leading-tight truncate">
+              {note.title}
+            </h3>
+            
+            {/* Date + Preview */}
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-[13px] text-slate-400 font-medium flex-shrink-0">
+                {formatDate(note.updated_at)}
+              </span>
+              <span className="text-[13px] text-slate-500 truncate">
+                {getFirstLine(note.content)}
+              </span>
+            </div>
+          </div>
+
+          {/* Delete button - visible on hover */}
           <button
             onClick={handleDelete}
-            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50/50 rounded-lg transition-colors"
-            title="Delete"
+            className="p-2 text-slate-300 hover:text-red-500 rounded-full 
+              opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
-      
-      <p className="text-sm text-slate-600 line-clamp-4 mb-4 min-h-[4rem]">
-        {truncateContent(note.content)}
-      </p>
-      
-      <p className="text-xs text-slate-400">{formatDate(note.created_at)}</p>
+    );
+  }
+
+  // Grid layout - Card style
+  return (
+    <div
+      onClick={() => onClick(note)}
+      className={`group relative ${colorConfig.bg} rounded-2xl cursor-pointer
+        transition-all duration-200 hover:shadow-lg active:scale-[0.98] 
+        touch-manipulation border ${colorConfig.border} overflow-hidden
+        flex flex-col h-[180px] sm:h-[200px]`}
+      style={{ animationDelay: `${index * 30}ms` }}
+    >
+      {/* Pin badge */}
+      {note.is_pinned && (
+        <div className="absolute top-2.5 right-2.5 z-10">
+          <div className="w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center shadow-sm">
+            <Pin className="w-3 h-3 text-white fill-white" />
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 p-4 overflow-hidden">
+        {/* Title */}
+        <h3 className="font-semibold text-slate-900 text-[15px] leading-tight mb-2 line-clamp-2 pr-6">
+          {note.title}
+        </h3>
+        
+        {/* Preview */}
+        {note.content ? (
+          <p className="text-[13px] text-slate-500 leading-relaxed line-clamp-4 whitespace-pre-wrap">
+            {getPreview(note.content, 4)}
+          </p>
+        ) : (
+          <p className="text-[13px] text-slate-400 italic">No additional text</p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2.5 border-t border-slate-100/80 bg-white/40 flex items-center justify-between">
+        <span className="text-[12px] text-slate-400 font-medium">
+          {formatDate(note.updated_at)}
+        </span>
+        
+        {/* Delete button */}
+        <button
+          onClick={handleDelete}
+          className="p-1.5 text-slate-300 hover:text-red-500 rounded-full 
+            opacity-0 group-hover:opacity-100 transition-all -mr-1"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

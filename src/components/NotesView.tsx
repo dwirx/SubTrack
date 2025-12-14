@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, Plus, Search, LayoutGrid, List, Sparkles, StickyNote
+  ArrowLeft, Plus, Search, LayoutGrid, List, StickyNote, X, Folder
 } from 'lucide-react';
 import { supabase, Note, NoteInput } from '../lib/supabase';
 import { usePreferences } from '../contexts/PreferencesContext';
@@ -42,7 +42,7 @@ export default function NotesView({ onBack }: NotesViewProps) {
         .from('notes')
         .select('*')
         .order('is_pinned', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('updated_at', { ascending: false });
 
       if (error) throw error;
       setNotes(data || []);
@@ -71,7 +71,7 @@ export default function NotesView({ onBack }: NotesViewProps) {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Not authenticated');
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('notes')
       .insert({
         user_id: userData.user.id,
@@ -79,10 +79,19 @@ export default function NotesView({ onBack }: NotesViewProps) {
         content: input.content,
         color: input.color || 'default',
         is_pinned: input.is_pinned || false,
-      });
+      })
+      .select()
+      .single();
 
     if (error) throw error;
-    await loadNotes();
+    
+    // Open the new note for editing
+    if (data) {
+      await loadNotes();
+      setSelectedNote(data);
+      setShowNoteModal(false);
+      setShowDetailModal(true);
+    }
   };
 
   const handleUpdateNote = async (input: NoteInput) => {
@@ -99,7 +108,16 @@ export default function NotesView({ onBack }: NotesViewProps) {
       .eq('id', selectedNote.id);
 
     if (error) throw error;
-    await loadNotes();
+    
+    // Update local state
+    setNotes(notes.map(n => 
+      n.id === selectedNote.id 
+        ? { ...n, ...input, updated_at: new Date().toISOString() }
+        : n
+    ));
+    
+    // Update selected note
+    setSelectedNote(prev => prev ? { ...prev, ...input, updated_at: new Date().toISOString() } : null);
   };
 
   const handleDeleteNote = async () => {
@@ -124,11 +142,6 @@ export default function NotesView({ onBack }: NotesViewProps) {
     setShowNoteModal(true);
   };
 
-  const openEditModal = (note: Note) => {
-    setSelectedNote(note);
-    setShowNoteModal(true);
-  };
-
   const openDetailModal = (note: Note) => {
     setSelectedNote(note);
     setShowDetailModal(true);
@@ -140,189 +153,241 @@ export default function NotesView({ onBack }: NotesViewProps) {
   };
 
   const noteToDeleteTitle = notes.find(n => n.id === noteToDelete)?.title || '';
+  const pinnedNotes = filteredNotes.filter(n => n.is_pinned);
+  const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-teal-50/30">
-      {/* Background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-teal-400/10 to-blue-400/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-full blur-3xl" />
-      </div>
-
-      {/* Header */}
-      <header className="relative bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 sm:h-20">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={onBack}
-                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-transparent flex items-center gap-2">
-                  <StickyNote className="w-6 h-6 text-teal-600" />
-                  {t('notes.title') || 'My Notes'}
-                </h1>
-                <p className="text-sm text-slate-500 hidden sm:block">
-                  {t('notes.subtitle') || 'Capture your thoughts and ideas'}
-                </p>
-              </div>
-            </div>
-
+    <div className="min-h-screen bg-[#F2F2F7]">
+      {/* Header - iOS style */}
+      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl sticky top-0 z-40 border-b border-slate-200/50">
+        <div className="max-w-4xl mx-auto">
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 h-11">
             <button
-              onClick={openCreateModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-500 
-                text-white rounded-xl hover:from-teal-600 hover:to-cyan-600 font-medium transition-all
-                shadow-lg shadow-teal-500/25 hover:shadow-xl hover:-translate-y-0.5"
+              onClick={onBack}
+              className="flex items-center gap-0.5 text-[#007AFF] font-medium text-[17px] -ml-2 px-2 py-1 
+                rounded-lg active:bg-blue-50 transition-colors"
             >
-              <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">{t('notes.add') || 'New Note'}</span>
+              <ArrowLeft className="w-5 h-5" />
+              <span className="hidden sm:inline">Back</span>
             </button>
+            
+            <div className="flex items-center gap-2">
+              {/* Layout toggle */}
+              <div className="flex items-center bg-slate-200/60 rounded-lg p-0.5">
+                <button
+                  onClick={() => setLayoutMode('grid')}
+                  className={`p-1.5 rounded-md transition-all ${
+                    layoutMode === 'grid' ? 'bg-white shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setLayoutMode('list')}
+                  className={`p-1.5 rounded-md transition-all ${
+                    layoutMode === 'list' ? 'bg-white shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <button
+                onClick={openCreateModal}
+                className="p-2 text-[#007AFF] rounded-lg active:bg-blue-50 transition-colors"
+              >
+                <Plus className="w-6 h-6" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+
+          {/* Title */}
+          <div className="px-4 pb-2">
+            <h1 className="text-[34px] font-bold text-slate-900 tracking-tight">
+              {t('notes.title') || 'Notes'}
+            </h1>
+          </div>
+
+          {/* Search bar */}
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-9 py-2 bg-slate-200/60 rounded-xl text-[15px]
+                  placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30
+                  transition-all"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 
+                    hover:text-slate-600 rounded-full bg-slate-300/60"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 
-              group-focus-within:text-teal-500 transition-colors" />
-            <input
-              type="text"
-              placeholder={t('notes.search') || 'Search notes...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 
-                focus:ring-teal-500 focus:border-teal-500 bg-white/80 backdrop-blur-sm 
-                transition-all hover:border-slate-300"
-            />
-          </div>
-
-          <div className="flex items-center bg-slate-100/80 backdrop-blur-sm rounded-xl p-1">
-            <button
-              onClick={() => setLayoutMode('grid')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                layoutMode === 'grid'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('notes.grid') || 'Grid'}</span>
-            </button>
-            <button
-              onClick={() => setLayoutMode('list')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                layoutMode === 'list'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('notes.list') || 'List'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Notes count */}
-        <p className="text-sm text-slate-500 mb-4">
-          {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
-          {searchTerm && ` matching "${searchTerm}"`}
-        </p>
-
-        {/* Content */}
+      <main className="max-w-4xl mx-auto px-4 py-4">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-teal-200 rounded-full animate-spin border-t-teal-600" />
-              <Sparkles className="w-6 h-6 text-teal-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            </div>
-            <p className="text-slate-500 animate-pulse">{t('notes.loading') || 'Loading notes...'}</p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="w-10 h-10 border-3 border-slate-200 border-t-[#007AFF] rounded-full animate-spin" />
+            <p className="text-slate-400 mt-4 text-[15px]">Loading...</p>
           </div>
         ) : filteredNotes.length === 0 ? (
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-slate-200/50 p-12 text-center animate-fade-in-up">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <StickyNote className="w-10 h-10 text-slate-400" />
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-20 h-20 bg-slate-200/60 rounded-3xl flex items-center justify-center mb-4">
+              {searchTerm ? (
+                <Search className="w-10 h-10 text-slate-300" />
+              ) : (
+                <StickyNote className="w-10 h-10 text-slate-300" />
+              )}
             </div>
             {searchTerm ? (
               <>
-                <p className="text-slate-600 text-lg mb-2">{t('notes.noResults') || 'No notes found'}</p>
-                <p className="text-slate-400 text-sm">Try a different search term</p>
+                <p className="text-slate-500 text-[17px] font-medium">No Results</p>
+                <p className="text-slate-400 text-[15px] mt-1">No notes match "{searchTerm}"</p>
               </>
             ) : (
               <>
-                <p className="text-slate-600 text-lg mb-4">{t('notes.empty') || 'No notes yet'}</p>
-                <button
-                  onClick={openCreateModal}
-                  className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 font-semibold hover:underline"
-                >
-                  <Plus className="w-4 h-4" />
-                  {t('notes.createFirst') || 'Create your first note'}
-                </button>
+                <p className="text-slate-500 text-[17px] font-medium">No Notes</p>
+                <p className="text-slate-400 text-[15px] mt-1 mb-4">Tap + to create a note</p>
               </>
             )}
           </div>
-        ) : layoutMode === 'grid' ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredNotes.map((note, index) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onEdit={openEditModal}
-                onDelete={openDeleteModal}
-                onClick={openDetailModal}
-                layoutMode={layoutMode}
-                index={index}
-              />
-            ))}
-          </div>
         ) : (
-          <div className="space-y-3">
-            {filteredNotes.map((note, index) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onEdit={openEditModal}
-                onDelete={openDeleteModal}
-                onClick={openDetailModal}
-                layoutMode={layoutMode}
-                index={index}
-              />
-            ))}
+          <div className="space-y-6 pb-24">
+            {/* Pinned section */}
+            {pinnedNotes.length > 0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-6 h-6 bg-amber-400 rounded-lg flex items-center justify-center">
+                    <span className="text-white text-xs">📌</span>
+                  </div>
+                  <h2 className="text-[13px] font-semibold text-slate-500 uppercase tracking-wide">
+                    Pinned
+                  </h2>
+                  <span className="text-[13px] text-slate-400">{pinnedNotes.length}</span>
+                </div>
+                
+                {layoutMode === 'grid' ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    {pinnedNotes.map((note, index) => (
+                      <NoteCard
+                        key={note.id}
+                        note={note}
+                        onEdit={openDetailModal}
+                        onDelete={openDeleteModal}
+                        onClick={openDetailModal}
+                        layoutMode={layoutMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100">
+                    {pinnedNotes.map((note, index) => (
+                      <NoteCard
+                        key={note.id}
+                        note={note}
+                        onEdit={openDetailModal}
+                        onDelete={openDeleteModal}
+                        onClick={openDetailModal}
+                        layoutMode={layoutMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* All notes section */}
+            {unpinnedNotes.length > 0 && (
+              <section>
+                {pinnedNotes.length > 0 && (
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <div className="w-6 h-6 bg-slate-400 rounded-lg flex items-center justify-center">
+                      <Folder className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <h2 className="text-[13px] font-semibold text-slate-500 uppercase tracking-wide">
+                      Notes
+                    </h2>
+                    <span className="text-[13px] text-slate-400">{unpinnedNotes.length}</span>
+                  </div>
+                )}
+                
+                {layoutMode === 'grid' ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    {unpinnedNotes.map((note, index) => (
+                      <NoteCard
+                        key={note.id}
+                        note={note}
+                        onEdit={openDetailModal}
+                        onDelete={openDeleteModal}
+                        onClick={openDetailModal}
+                        layoutMode={layoutMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100">
+                    {unpinnedNotes.map((note, index) => (
+                      <NoteCard
+                        key={note.id}
+                        note={note}
+                        onEdit={openDetailModal}
+                        onDelete={openDeleteModal}
+                        onClick={openDetailModal}
+                        layoutMode={layoutMode}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         )}
+      </main>
+
+      {/* Floating action button */}
+      <div className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-30">
+        <button
+          onClick={openCreateModal}
+          className="w-14 h-14 bg-[#007AFF] text-white rounded-full shadow-xl shadow-blue-500/30 
+            flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <Plus className="w-7 h-7" strokeWidth={2.5} />
+        </button>
       </div>
 
       {/* Modals */}
       <NoteModal
         isOpen={showNoteModal}
-        onClose={() => {
-          setShowNoteModal(false);
-          setSelectedNote(null);
-        }}
-        onSave={selectedNote ? handleUpdateNote : handleCreateNote}
-        note={selectedNote || undefined}
+        onClose={() => setShowNoteModal(false)}
+        onSave={handleCreateNote}
       />
 
       <NoteDetailModal
         isOpen={showDetailModal}
         onClose={() => {
           setShowDetailModal(false);
-          setSelectedNote(null);
+          loadNotes(); // Refresh list after closing
         }}
         note={selectedNote}
-        onEdit={(note) => {
-          setShowDetailModal(false);
-          openEditModal(note);
-        }}
-        onDelete={(id) => {
-          setShowDetailModal(false);
-          openDeleteModal(id);
-        }}
+        onSave={handleUpdateNote}
+        onDelete={openDeleteModal}
       />
 
       <DeleteConfirmModal
@@ -332,8 +397,8 @@ export default function NotesView({ onBack }: NotesViewProps) {
           setNoteToDelete(null);
         }}
         onConfirm={handleDeleteNote}
-        title={`Delete "${noteToDeleteTitle}"?`}
-        message="This note will be permanently deleted. This action cannot be undone."
+        title="Delete Note"
+        message={`Are you sure you want to delete "${noteToDeleteTitle}"? This cannot be undone.`}
       />
     </div>
   );
