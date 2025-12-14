@@ -14,6 +14,7 @@ export const translations = {
       myProfile: 'My Profile',
       calendar: 'Calendar',
       analytics: 'Analytics',
+      notes: 'Notes',
       signOut: 'Sign Out',
     },
     summary: {
@@ -169,6 +170,20 @@ export const translations = {
       retry: 'Retry',
       back: 'Back',
     },
+    notes: {
+      title: 'My Notes',
+      subtitle: 'Capture your thoughts and ideas',
+      add: 'New Note',
+      search: 'Search notes...',
+      grid: 'Grid',
+      list: 'List',
+      loading: 'Loading notes...',
+      empty: 'No notes yet',
+      noResults: 'No notes found',
+      createFirst: 'Create your first note',
+      deleteTitle: 'Delete Note',
+      deleteMessage: 'This note will be permanently deleted. This action cannot be undone.',
+    },
   },
   id: {
     app: {
@@ -183,6 +198,7 @@ export const translations = {
       myProfile: 'Profil Saya',
       calendar: 'Kalender',
       analytics: 'Analitik',
+      notes: 'Catatan',
       signOut: 'Keluar',
     },
     summary: {
@@ -337,6 +353,20 @@ export const translations = {
       error: 'Terjadi kesalahan',
       retry: 'Coba lagi',
       back: 'Kembali',
+    },
+    notes: {
+      title: 'Catatan Saya',
+      subtitle: 'Simpan ide dan pemikiran Anda',
+      add: 'Catatan Baru',
+      search: 'Cari catatan...',
+      grid: 'Kotak',
+      list: 'Daftar',
+      loading: 'Memuat catatan...',
+      empty: 'Belum ada catatan',
+      noResults: 'Catatan tidak ditemukan',
+      createFirst: 'Buat catatan pertama Anda',
+      deleteTitle: 'Hapus Catatan',
+      deleteMessage: 'Catatan ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.',
     },
   },
 };

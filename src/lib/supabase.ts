@@ -70,3 +70,31 @@ export const REMINDER_OPTIONS = [
   { value: 14, label: '2 weeks before (H-14)', emoji: '📯' },
   { value: 30, label: '1 month before (H-30)', emoji: '🔊' },
 ];
+
+// Notes types
+export type Note = {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  color: string;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NoteInput = {
+  title: string;
+  content: string;
+  color?: string;
+  is_pinned?: boolean;
+};
+
+export const NOTE_COLORS = [
+  { value: 'default', label: 'Default', bg: 'bg-white', border: 'border-slate-200', hover: 'hover:border-slate-300' },
+  { value: 'yellow', label: 'Yellow', bg: 'bg-amber-50', border: 'border-amber-200', hover: 'hover:border-amber-300' },
+  { value: 'green', label: 'Green', bg: 'bg-emerald-50', border: 'border-emerald-200', hover: 'hover:border-emerald-300' },
+  { value: 'blue', label: 'Blue', bg: 'bg-blue-50', border: 'border-blue-200', hover: 'hover:border-blue-300' },
+  { value: 'purple', label: 'Purple', bg: 'bg-purple-50', border: 'border-purple-200', hover: 'hover:border-purple-300' },
+  { value: 'pink', label: 'Pink', bg: 'bg-pink-50', border: 'border-pink-200', hover: 'hover:border-pink-300' },
+];
