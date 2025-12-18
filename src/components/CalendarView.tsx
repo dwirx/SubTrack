@@ -22,7 +22,7 @@ const subscriptionColors = [
 ];
 
 export default function CalendarView({ subscriptions }: CalendarViewProps) {
-  const { t, formatCurrency, preferences } = usePreferences();
+  const { t, formatCurrency, convertCurrency, preferences } = usePreferences();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
@@ -90,8 +90,8 @@ export default function CalendarView({ subscriptions }: CalendarViewProps) {
   const totalThisMonth = useMemo(() => {
     return Object.values(billingDates)
       .flat()
-      .reduce((sum, sub) => sum + sub.price, 0);
-  }, [billingDates]);
+      .reduce((sum, sub) => sum + convertCurrency(sub.price, sub.currency, preferences.defaultCurrency), 0);
+  }, [billingDates, convertCurrency, preferences.defaultCurrency]);
 
   const selectedDaySubs = selectedDay ? billingDates[selectedDay] || [] : [];
 
@@ -362,7 +362,7 @@ export default function CalendarView({ subscriptions }: CalendarViewProps) {
                   </span>
                   <span className="font-bold text-slate-900 text-sm sm:text-base">
                     {formatCurrency(
-                      selectedDaySubs.reduce((sum, sub) => sum + sub.price, 0),
+                      selectedDaySubs.reduce((sum, sub) => sum + convertCurrency(sub.price, sub.currency, preferences.defaultCurrency), 0),
                       preferences.defaultCurrency
                     )}
                   </span>

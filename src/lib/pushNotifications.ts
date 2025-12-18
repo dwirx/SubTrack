@@ -100,10 +100,9 @@ export async function showLocalNotification(
     await registration.showNotification(title, {
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
-      vibrate: [100, 50, 100],
       ...options,
-    });
-  } catch (error) {
+    } as NotificationOptions);
+  } catch {
     // Fallback to regular notification
     new Notification(title, {
       icon: '/icons/icon-192x192.png',
@@ -128,12 +127,7 @@ export function scheduleReminderNotification(
   showLocalNotification(title, {
     body,
     tag: `reminder-${subscriptionName}`,
-    renotify: true,
     requireInteraction: daysUntilBilling <= 1,
-    actions: [
-      { action: 'view', title: 'View Details' },
-      { action: 'dismiss', title: 'Dismiss' },
-    ],
     data: {
       type: 'reminder',
       subscriptionName,

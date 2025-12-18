@@ -1,23 +1,33 @@
 import { TrendingUp, Award, AlertTriangle } from 'lucide-react';
 import { Subscription } from '../lib/supabase';
+import { usePreferences } from '../contexts/PreferencesContext';
 
 type AnalyticsViewProps = {
   subscriptions: Subscription[];
 };
 
 export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
+  const { formatCurrency, convertCurrency, preferences } = usePreferences();
   const activeSubscriptions = subscriptions.filter(sub => sub.status === 'active');
 
+  // Use default currency from preferences for display
+  const displayCurrency = preferences.defaultCurrency;
+
+  // Calculate category spending with currency conversion
   const categorySpending = activeSubscriptions.reduce((acc, sub) => {
-    const monthlyPrice = sub.billing_cycle === 'monthly' ? sub.price : sub.price / 12;
+    const convertedPrice = convertCurrency(sub.price, sub.currency, displayCurrency);
+    const monthlyPrice = sub.billing_cycle === 'monthly' ? convertedPrice : convertedPrice / 12;
     acc[sub.category] = (acc[sub.category] || 0) + monthlyPrice;
     return acc;
   }, {} as Record<string, number>);
 
+  // Sort top services by converted monthly price
   const topServices = [...activeSubscriptions]
     .sort((a, b) => {
-      const aMonthly = a.billing_cycle === 'monthly' ? a.price : a.price / 12;
-      const bMonthly = b.billing_cycle === 'monthly' ? b.price : b.price / 12;
+      const aConverted = convertCurrency(a.price, a.currency, displayCurrency);
+      const bConverted = convertCurrency(b.price, b.currency, displayCurrency);
+      const aMonthly = a.billing_cycle === 'monthly' ? aConverted : aConverted / 12;
+      const bMonthly = b.billing_cycle === 'monthly' ? bConverted : bConverted / 12;
       return bMonthly - aMonthly;
     })
     .slice(0, 5);
@@ -34,13 +44,8 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
     Other: 'bg-slate-500',
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Helper to format with default currency
+  const formatAmount = (amount: number) => formatCurrency(amount, displayCurrency);
 
   return (
     <div className="space-y-8">
@@ -61,7 +66,7 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
                   <div key={category}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-slate-700">{category}</span>
-                      <span className="text-sm font-bold text-slate-900">{formatCurrency(amount)}</span>
+                      <span className="text-sm font-bold text-slate-900">{formatAmount(amount)}</span>
                     </div>
                     <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                       <div
@@ -86,7 +91,8 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
 
           <div className="space-y-4">
             {topServices.map((sub, index) => {
-              const monthlyPrice = sub.billing_cycle === 'monthly' ? sub.price : sub.price / 12;
+              const convertedPrice = convertCurrency(sub.price, sub.currency, displayCurrency);
+              const monthlyPrice = sub.billing_cycle === 'monthly' ? convertedPrice : convertedPrice / 12;
               return (
                 <div key={sub.id} className="flex items-center space-x-4 p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full font-bold text-sm">
@@ -97,7 +103,7 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
                     <p className="text-sm text-slate-600">{sub.category}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-slate-900">{formatCurrency(monthlyPrice)}</p>
+                    <p className="font-bold text-slate-900">{formatAmount(monthlyPrice)}</p>
                     <p className="text-xs text-slate-500">per month</p>
                   </div>
                 </div>
@@ -116,19 +122,20 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
         <div className="grid md:grid-cols-2 gap-6">
           <InsightCard
             title="Average Cost per Subscription"
-            value={formatCurrency(totalMonthly / activeSubscriptions.length || 0)}
+            value={formatAmount(totalMonthly / activeSubscriptions.length || 0)}
             description="Monthly average across all active subscriptions"
           />
 
           <InsightCard
             title="Shared Subscriptions"
             value={activeSubscriptions.filter(sub => sub.is_shared).length.toString()}
-            description={`Saving ${formatCurrency(
+            description={`Saving ${formatAmount(
               activeSubscriptions
                 .filter(sub => sub.is_shared && sub.shared_with_count)
                 .reduce((sum, sub) => {
-                  const perPerson = sub.price / (sub.shared_with_count || 1);
-                  return sum + (sub.price - perPerson);
+                  const convertedPrice = convertCurrency(sub.price, sub.currency, displayCurrency);
+                  const perPerson = convertedPrice / (sub.shared_with_count || 1);
+                  return sum + (convertedPrice - perPerson);
                 }, 0)
             )} through sharing`}
           />
@@ -136,11 +143,12 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
           <InsightCard
             title="Company-Paid Subscriptions"
             value={activeSubscriptions.filter(sub => sub.paid_by_company).length.toString()}
-            description={`${formatCurrency(
+            description={`${formatAmount(
               activeSubscriptions
                 .filter(sub => sub.paid_by_company)
                 .reduce((sum, sub) => {
-                  const monthlyPrice = sub.billing_cycle === 'monthly' ? sub.price : sub.price / 12;
+                  const convertedPrice = convertCurrency(sub.price, sub.currency, displayCurrency);
+                  const monthlyPrice = sub.billing_cycle === 'monthly' ? convertedPrice : convertedPrice / 12;
                   return sum + monthlyPrice;
                 }, 0)
             )} covered by company`}
@@ -164,11 +172,11 @@ export default function AnalyticsView({ subscriptions }: AnalyticsViewProps) {
           </div>
           <div>
             <p className="text-blue-100 text-sm mb-1">Monthly Total</p>
-            <p className="text-4xl font-bold">{formatCurrency(totalMonthly)}</p>
+            <p className="text-4xl font-bold">{formatAmount(totalMonthly)}</p>
           </div>
           <div>
             <p className="text-blue-100 text-sm mb-1">Yearly Total</p>
-            <p className="text-4xl font-bold">{formatCurrency(totalMonthly * 12)}</p>
+            <p className="text-4xl font-bold">{formatAmount(totalMonthly * 12)}</p>
           </div>
         </div>
       </div>

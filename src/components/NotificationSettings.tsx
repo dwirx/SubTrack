@@ -1,12 +1,12 @@
-import React from 'react';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { Bell, BellOff, BellRing, Smartphone, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Bell, BellOff, BellRing, Smartphone, CheckCircle, XCircle, Loader2, X } from 'lucide-react';
 
 interface NotificationSettingsProps {
   onClose?: () => void;
 }
 
-export function NotificationSettings({ onClose }: NotificationSettingsProps) {
+export function NotificationSettings(_props: NotificationSettingsProps) {
+  const { onClose } = _props;
   const {
     isSupported,
     permission,
@@ -48,14 +48,27 @@ export function NotificationSettings({ onClose }: NotificationSettingsProps) {
     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-4 text-white">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-            <Bell className="w-6 h-6" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+              <Bell className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Push Notifications</h2>
+              <p className="text-white/80 text-sm">Get reminders for upcoming payments</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold">Push Notifications</h2>
-            <p className="text-white/80 text-sm">Get reminders for upcoming payments</p>
-          </div>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              aria-label="Close notification settings"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 

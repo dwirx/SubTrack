@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, ExternalLink, RefreshCw, Calendar
 } from 'lucide-react';
 import { supabase, Subscription, CURRENCIES, CATEGORIES } from '../lib/supabase';
+import { usePreferences } from '../contexts/PreferencesContext';
 import QuickRenewModal from './QuickRenewModal';
 
 type SerpentineSubscriptionListProps = {
@@ -17,6 +18,7 @@ export default function SerpentineSubscriptionList({
   onDelete,
   onUpdate
 }: SerpentineSubscriptionListProps) {
+  const { formatCurrency, formatDate: formatDatePref } = usePreferences();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Subscription>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -100,25 +102,9 @@ export default function SerpentineSubscriptionList({
     return <span className="text-4xl">{cat?.emoji || '📦'}</span>;
   };
 
-  const getCurrencySymbol = (code: string) => {
-    return CURRENCIES.find(c => c.code === code)?.symbol || code;
-  };
-
-  const formatCurrency = (amount: number, currency: string) => {
-    const symbol = getCurrencySymbol(currency);
-    if (currency === 'IDR') {
-      return `${symbol}${new Intl.NumberFormat('id-ID').format(amount)}`;
-    }
-    return `${symbol}${amount.toFixed(2)}`;
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDatePref(dateString);
   };
 
   const getDaysUntilBilling = (nextDate?: string) => {

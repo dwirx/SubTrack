@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { getLastSyncTimestamp, formatLastSync } from '../lib/offlineManager';
 import { WifiOff, RefreshCw } from 'lucide-react';

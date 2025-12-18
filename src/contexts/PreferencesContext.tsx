@@ -25,8 +25,29 @@ type PreferencesContextType = {
   disconnectTelegram: () => Promise<void>;
   t: (key: string) => string;
   formatCurrency: (amount: number, currency?: string) => string;
+  convertCurrency: (amount: number, fromCurrency: string, toCurrency?: string) => number;
+  convertAndFormat: (amount: number, fromCurrency: string) => string;
   formatDate: (dateString: string | undefined) => string;
   loading: boolean;
+};
+
+// Exchange rates (base: USD) - update these periodically or fetch from API
+const EXCHANGE_RATES: Record<string, number> = {
+  USD: 1,
+  IDR: 16000,    // 1 USD = 16,000 IDR (approximate)
+  EUR: 0.92,     // 1 USD = 0.92 EUR
+  GBP: 0.79,     // 1 USD = 0.79 GBP
+  JPY: 150,      // 1 USD = 150 JPY
+  SGD: 1.35,     // 1 USD = 1.35 SGD
+  MYR: 4.70,     // 1 USD = 4.70 MYR
+  AUD: 1.55,     // 1 USD = 1.55 AUD
+  CAD: 1.36,     // 1 USD = 1.36 CAD
+  CNY: 7.25,     // 1 USD = 7.25 CNY
+  INR: 83,       // 1 USD = 83 INR
+  KRW: 1350,     // 1 USD = 1350 KRW
+  THB: 36,       // 1 USD = 36 THB
+  VND: 24500,    // 1 USD = 24,500 VND
+  PHP: 56,       // 1 USD = 56 PHP
 };
 
 const defaultPreferences: UserPreferences = {
@@ -197,6 +218,24 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     return getNestedTranslation(langTranslations as unknown as Record<string, unknown>, key);
   };
 
+  // Convert amount from one currency to another
+  const convertCurrency = (amount: number, fromCurrency: string, toCurrency?: string): number => {
+    const targetCurrency = toCurrency || preferences.defaultCurrency;
+    
+    // If same currency, no conversion needed
+    if (fromCurrency === targetCurrency) return amount;
+    
+    // Get exchange rates (default to 1 if not found)
+    const fromRate = EXCHANGE_RATES[fromCurrency] || 1;
+    const toRate = EXCHANGE_RATES[targetCurrency] || 1;
+    
+    // Convert: first to USD, then to target currency
+    const amountInUSD = amount / fromRate;
+    const convertedAmount = amountInUSD * toRate;
+    
+    return convertedAmount;
+  };
+
   const formatCurrency = (amount: number, currency?: string): string => {
     const curr = currency || preferences.defaultCurrency;
     const currencyInfo = CURRENCIES.find(c => c.code === curr);
@@ -204,17 +243,23 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
     const locale = preferences.language === 'id' ? 'id-ID' : 'en-US';
 
-    if (curr === 'IDR' || curr === 'JPY') {
+    if (curr === 'IDR' || curr === 'JPY' || curr === 'KRW' || curr === 'VND') {
       return `${symbol}${new Intl.NumberFormat(locale, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      }).format(amount)}`;
+      }).format(Math.round(amount))}`;
     }
 
     return `${symbol}${new Intl.NumberFormat(locale, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(amount)}`;
+  };
+
+  // Convert amount to default currency and format it
+  const convertAndFormat = (amount: number, fromCurrency: string): string => {
+    const convertedAmount = convertCurrency(amount, fromCurrency);
+    return formatCurrency(convertedAmount, preferences.defaultCurrency);
   };
 
   const formatDate = (dateString: string | undefined): string => {
@@ -256,6 +301,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       disconnectTelegram,
       t,
       formatCurrency,
+      convertCurrency,
+      convertAndFormat,
       formatDate,
       loading,
     }}>

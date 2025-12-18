@@ -229,6 +229,7 @@ export default function ExportImportModal({ isOpen, onClose, onSuccess, subscrip
         setImportResult({
           success: 0,
           failed: 1,
+          skipped: 0,
           errors: ['Format file tidak didukung. Gunakan JSON atau CSV.']
         });
       }

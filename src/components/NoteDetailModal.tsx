@@ -16,7 +16,6 @@ export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelet
   const [color, setColor] = useState('default');
   const [isPinned, setIsPinned] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);

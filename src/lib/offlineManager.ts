@@ -1,7 +1,6 @@
 import { getDb, Subscription, PendingChange } from './offlineDb';
 
 const LAST_SYNC_KEY = 'lastSyncTimestamp';
-const USER_ID_KEY = 'userId';
 
 // Cache subscriptions to IndexedDB
 export async function cacheSubscriptions(subscriptions: Subscription[]): Promise<void> {

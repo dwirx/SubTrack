@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { X, Search, Smile, Image, Sparkles, Clock, Trash2, Copy, Check } from 'lucide-react';
+import { X, Search, Smile, Image, Sparkles, Clock, Copy, Check } from 'lucide-react';
 
 type IconPickerProps = {
   isOpen: boolean;

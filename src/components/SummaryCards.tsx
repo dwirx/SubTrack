@@ -9,10 +9,13 @@ type SummaryCardsProps = {
 };
 
 export default function SummaryCards({ subscriptions, onFilterChange }: SummaryCardsProps) {
-  const { t, formatCurrency, preferences } = usePreferences();
+  const { t, formatCurrency, convertCurrency, preferences } = usePreferences();
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
-  // Calculate totals
+  // Use default currency from preferences for all totals
+  const displayCurrency = preferences.defaultCurrency;
+
+  // Calculate totals with currency conversion
   const stats = useMemo(() => {
     const activeSubscriptions = subscriptions.filter(sub => sub.status === 'active' || sub.status === 'trial');
     const cancelledSubscriptions = subscriptions.filter(sub => sub.status === 'cancelled');
@@ -23,34 +26,39 @@ export default function SummaryCards({ subscriptions, onFilterChange }: SummaryC
 
     activeSubscriptions.forEach(sub => {
       const price = sub.price || 0;
+      // Convert price to display currency
+      const convertedPrice = convertCurrency(price, sub.currency, displayCurrency);
+      
       if (sub.billing_cycle === 'monthly') {
-        monthly += price;
-        yearly += price * 12;
+        monthly += convertedPrice;
+        yearly += convertedPrice * 12;
       } else if (sub.billing_cycle === 'yearly') {
-        monthly += price / 12;
-        yearly += price;
+        monthly += convertedPrice / 12;
+        yearly += convertedPrice;
       } else if ((sub.billing_cycle as string) === 'quarterly') {
-        monthly += price / 3;
-        yearly += price * 4;
+        monthly += convertedPrice / 3;
+        yearly += convertedPrice * 4;
       } else if ((sub.billing_cycle as string) === 'weekly') {
-        monthly += price * 4;
-        yearly += price * 52;
+        monthly += convertedPrice * 4;
+        yearly += convertedPrice * 52;
       } else {
-        monthly += price;
+        monthly += convertedPrice;
       }
     });
 
-    // Calculate cancelled savings
+    // Calculate cancelled savings with conversion
     cancelledSubscriptions.forEach(sub => {
       const price = sub.price || 0;
+      const convertedPrice = convertCurrency(price, sub.currency, displayCurrency);
+      
       if (sub.billing_cycle === 'monthly') {
-        cancelledMonthly += price;
+        cancelledMonthly += convertedPrice;
       } else if (sub.billing_cycle === 'yearly') {
-        cancelledMonthly += price / 12;
+        cancelledMonthly += convertedPrice / 12;
       } else if ((sub.billing_cycle as string) === 'quarterly') {
-        cancelledMonthly += price / 3;
+        cancelledMonthly += convertedPrice / 3;
       } else if ((sub.billing_cycle as string) === 'weekly') {
-        cancelledMonthly += price * 4;
+        cancelledMonthly += convertedPrice * 4;
       }
     });
 
@@ -78,18 +86,9 @@ export default function SummaryCards({ subscriptions, onFilterChange }: SummaryC
       expiringCount: expiringThisWeek.length,
       expiringSubscriptions: expiringThisWeek,
     };
-  }, [subscriptions]);
+  }, [subscriptions, convertCurrency, displayCurrency]);
 
-  // Get display currency
-  const displayCurrency = useMemo(() => {
-    if (subscriptions.length === 0) return preferences.defaultCurrency;
-    const currencies = subscriptions.map(s => s.currency);
-    const counts = currencies.reduce((acc, curr) => {
-      acc[curr] = (acc[curr] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'IDR';
-  }, [subscriptions, preferences.defaultCurrency]);
+
 
   const handleCardClick = (cardType: string) => {
     if (selectedCard === cardType) {
@@ -228,7 +227,7 @@ export default function SummaryCards({ subscriptions, onFilterChange }: SummaryC
                 </span>
                 <span className="font-bold text-slate-900">
                   {formatCurrency(
-                    getDetailSubscriptions().reduce((sum, sub) => sum + sub.price, 0),
+                    getDetailSubscriptions().reduce((sum, sub) => sum + convertCurrency(sub.price, sub.currency, displayCurrency), 0),
                     displayCurrency
                   )}
                 </span>
