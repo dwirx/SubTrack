@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [view, setView] = useState<View>('dashboard');
   const [layoutMode, setLayoutMode] = useState<'grid' | 'serpentine'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'nextBilling'>('nextBilling');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
