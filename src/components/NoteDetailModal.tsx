@@ -108,9 +108,9 @@ export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelet
   const selectedColor = NOTE_COLORS.find(c => c.value === color) || NOTE_COLORS[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#F2F2F7]">
+    <div className="fixed inset-0 z-50 bg-[#F2F2F7] flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl sticky top-0 z-10 border-b border-slate-200/50">
+      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl flex-shrink-0 z-10 border-b border-slate-200/50">
         <div className="flex items-center justify-between px-2 h-11 safe-area-top">
           <button
             onClick={handleClose}
@@ -201,9 +201,9 @@ export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelet
         </div>
       </header>
 
-      {/* Content - Full screen editable */}
-      <main className={`min-h-[calc(100vh-44px)] ${selectedColor.bg} transition-colors duration-200`}>
-        <div className="max-w-3xl mx-auto px-4 py-6">
+      {/* Content - Full screen editable with scroll */}
+      <main className={`flex-1 overflow-y-auto overscroll-contain ${selectedColor.bg} transition-colors duration-200`}>
+        <div className="max-w-3xl mx-auto px-4 py-6 pb-20">
           {/* Date */}
           <p className="text-[13px] text-slate-400 text-center mb-4">
             {formatDate(note.updated_at)}
@@ -221,8 +221,9 @@ export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelet
             placeholder="Title"
             className="w-full text-[28px] font-bold text-slate-900 placeholder-slate-300
               bg-transparent border-none focus:outline-none focus:ring-0 resize-none
-              leading-tight mb-4 overflow-hidden"
+              leading-tight mb-4"
             rows={1}
+            style={{ overflow: 'hidden' }}
           />
           
           {/* Content - Editable */}
@@ -237,7 +238,8 @@ export default function NoteDetailModal({ isOpen, onClose, note, onSave, onDelet
             placeholder="Start typing..."
             className="w-full text-[17px] text-slate-700 placeholder-slate-400 leading-relaxed
               bg-transparent border-none focus:outline-none focus:ring-0 resize-none
-              min-h-[50vh] overflow-hidden"
+              min-h-[200px]"
+            style={{ overflow: 'hidden' }}
           />
         </div>
       </main>

@@ -157,9 +157,9 @@ export default function NotesView({ onBack }: NotesViewProps) {
   const unpinnedNotes = filteredNotes.filter(n => !n.is_pinned);
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7]">
+    <div className="fixed inset-0 bg-[#F2F2F7] flex flex-col overflow-hidden">
       {/* Header - iOS style */}
-      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl sticky top-0 z-40 border-b border-slate-200/50">
+      <header className="bg-[#F2F2F7]/90 backdrop-blur-xl flex-shrink-0 z-40 border-b border-slate-200/50">
         <div className="max-w-4xl mx-auto">
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 h-11">
@@ -236,8 +236,9 @@ export default function NotesView({ onBack }: NotesViewProps) {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-4">
+      {/* Main content - scrollable */}
+      <main className="flex-1 overflow-y-auto overscroll-contain">
+        <div className="max-w-4xl mx-auto px-4 py-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-10 h-10 border-3 border-slate-200 border-t-[#007AFF] rounded-full animate-spin" />
@@ -359,6 +360,7 @@ export default function NotesView({ onBack }: NotesViewProps) {
             )}
           </div>
         )}
+        </div>
       </main>
 
       {/* Floating action button */}
